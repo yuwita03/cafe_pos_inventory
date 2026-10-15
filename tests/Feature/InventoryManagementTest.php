@@ -13,6 +13,10 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 
+beforeEach(function () {
+    $this->actingAs(User::factory()->create(['role' => 'owner']));
+});
+
 /** @return array{stock_item_id: int, quantity_delta: string, reason: string, source_key: string} */
 function inventoryAdjustment(StockItem $item, string $delta = '100.000'): array
 {
@@ -50,7 +54,7 @@ test('stock adjustments preserve three decimal places and retries apply exactly 
 
     $this->assertDatabaseHas('stock_items', ['id' => $item->id, 'on_hand_qty' => '0.300']);
     $this->assertDatabaseCount('stock_movements', 3);
-    $this->assertDatabaseHas('stock_movements', ['source_key' => $payload['source_key'], 'quantity_delta' => '0.101', 'reason' => $payload['reason'], 'actor_user_id' => null]);
+    $this->assertDatabaseHas('stock_movements', ['source_key' => $payload['source_key'], 'quantity_delta' => '0.101', 'reason' => $payload['reason'], 'actor_user_id' => auth()->id()]);
 });
 
 test('adjustment requires a reason and rejects invalid or negative quantities without movements', function (string $delta, string $reason): void {
