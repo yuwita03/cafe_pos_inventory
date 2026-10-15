@@ -2,41 +2,34 @@
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed, ref, useId, watch } from 'vue';
 import AppIcon from '@/components/AppIcon.vue';
-import { categories, dashboard, menu, options } from '@/routes/admin';
+import { adminNavigation } from '@/lib/adminNavigation';
 const emit = defineEmits<{ navigate: [] }>();
 const page = usePage();
 const currentPath = computed(() => page.url.split('?')[0]);
-const menuExpanded = ref(false);
-const menuNavigationId = useId();
-const menuNavigation = [
-    {
-        label: 'Produk',
-        description: 'Menu & varian',
-        icon: 'coffee',
-        href: menu,
-    },
-    {
-        label: 'Kategori',
-        description: 'Kelompok menu',
-        icon: 'category',
-        href: categories,
-    },
-    {
-        label: 'Grup opsi',
-        description: 'Pilihan pelanggan',
-        icon: 'options',
-        href: options,
-    },
-];
+const navigationId = useId();
+const expanded = ref<string[]>([]);
+const currentItem = computed(() =>
+    adminNavigation
+        .flatMap((group) => group.items)
+        .find((item) => item.href.url() === currentPath.value),
+);
 watch(
     currentPath,
     (path) => {
-        menuExpanded.value = menuNavigation.some(
-            (item) => path === item.href.url(),
+        const activeGroup = adminNavigation.find((group) =>
+            group.items.some((item) => item.href.url() === path),
         );
+        if (activeGroup && !expanded.value.includes(activeGroup.label)) {
+            expanded.value.push(activeGroup.label);
+        }
     },
     { immediate: true },
 );
+function toggleGroup(label: string): void {
+    expanded.value = expanded.value.includes(label)
+        ? expanded.value.filter((item) => item !== label)
+        : [...expanded.value, label];
+}
 </script>
 
 <template>
@@ -51,73 +44,88 @@ watch(
                 >V1</span
             >
         </div>
-        <nav aria-label="Navigasi admin">
-            <p class="nav-heading">WORKSPACE</p>
-            <Link
-                :href="dashboard()"
-                class="nav-item"
-                :class="{ selected: currentPath === dashboard.url() }"
-                :aria-current="
-                    currentPath === dashboard.url() ? 'page' : undefined
-                "
-                @click="emit('navigate')"
+        <nav class="sidebar-navigation" aria-label="Navigasi admin">
+            <template
+                v-for="(group, index) in adminNavigation"
+                :key="group.label"
             >
-                <AppIcon name="grid" />
-                <span>Dashboard<small>Ringkasan operasional</small></span>
-                <AppIcon name="arrow" :size="14" />
-            </Link>
-            <button
-                type="button"
-                class="nav-item nav-group-toggle"
-                :aria-expanded="menuExpanded"
-                :aria-controls="menuNavigationId"
-                @click="menuExpanded = !menuExpanded"
-            >
-                <AppIcon name="coffee" />
-                <span>Kelola Menu<small>Katalog & pilihan</small></span>
-                <AppIcon
-                    name="arrow"
-                    :size="14"
-                    class="nav-group-arrow"
-                    :class="{ expanded: menuExpanded }"
-                />
-            </button>
-            <div
-                v-show="menuExpanded"
-                :id="menuNavigationId"
-                class="nav-submenu"
-            >
-                <Link
-                    v-for="item in menuNavigation"
-                    :key="item.label"
-                    :href="item.href()"
-                    class="nav-item nav-child"
-                    :class="{ selected: currentPath === item.href.url() }"
-                    :aria-current="
-                        currentPath === item.href.url() ? 'page' : undefined
-                    "
-                    @click="emit('navigate')"
+                <p v-if="!group.icon" class="nav-heading">{{ group.label }}</p>
+                <button
+                    v-else
+                    type="button"
+                    class="nav-item nav-group-toggle"
+                    :class="{
+                        'group-active': group.items.some(
+                            (item) => item.href.url() === currentPath,
+                        ),
+                    }"
+                    :aria-expanded="expanded.includes(group.label)"
+                    :aria-controls="navigationId + '-' + index"
+                    @click="toggleGroup(group.label)"
                 >
-                    <AppIcon :name="item.icon" :size="17" />
-                    <span>
-                        {{ item.label }}<small>{{ item.description }}</small>
-                    </span>
-                </Link>
-            </div>
+                    <AppIcon :name="group.icon" />
+                    <span>{{ group.label }}</span>
+                    <AppIcon
+                        name="arrow"
+                        :size="14"
+                        class="nav-group-arrow"
+                        :class="{ expanded: expanded.includes(group.label) }"
+                    />
+                </button>
+                <div
+                    v-show="!group.icon || expanded.includes(group.label)"
+                    :id="navigationId + '-' + index"
+                    :class="{ 'nav-submenu': group.icon }"
+                >
+                    <Link
+                        v-for="item in group.items"
+                        :key="item.label"
+                        :href="item.href()"
+                        class="nav-item"
+                        :class="{
+                            'nav-child': group.icon,
+                            selected: currentPath === item.href.url(),
+                        }"
+                        :aria-current="
+                            currentPath === item.href.url() ? 'page' : undefined
+                        "
+                        @click="emit('navigate')"
+                    >
+                        <AppIcon
+                            :name="item.icon"
+                            :size="group.icon ? 17 : 20"
+                        />
+                        <span
+                            >{{ item.label
+                            }}<small>{{ item.description }}</small></span
+                        >
+                        <span
+                            v-if="'placeholder' in item && item.placeholder"
+                            class="nav-placeholder"
+                            aria-label="Placeholder"
+                            >UI</span
+                        >
+                    </Link>
+                </div>
+            </template>
         </nav>
         <div class="sidebar-bottom">
             <div class="prototype-note">
                 <AppIcon name="info" :size="18" />
                 <p>
                     <strong>{{
-                        page.url.split('?')[0] === dashboard.url()
-                            ? 'Pratinjau dashboard'
+                        currentItem &&
+                        ('prototype' in currentItem ||
+                            'placeholder' in currentItem)
+                            ? 'Pratinjau UI'
                             : 'Pengembangan lokal'
                     }}</strong
                     >{{
-                        page.url.split('?')[0] === dashboard.url()
-                            ? 'Dashboard menggunakan data contoh.'
-                            : 'Menu tersimpan di database. Login staf belum diaktifkan.'
+                        currentItem &&
+                        ('prototype' in currentItem ||
+                            'placeholder' in currentItem)
+                            ? 'Data contoh atau placeholder. Belum ada aksi operasional nyata.'
+                            : 'Data tersimpan. Login staf belum diaktifkan.'
                     }}
                 </p>
             </div>
