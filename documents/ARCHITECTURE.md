@@ -5,14 +5,14 @@
 
 ## 1. Stack
 
-| Bagian | Teknologi | Alasan |
-|---|---|---|
-| Backend | **Laravel (PHP)** | Routes, validation, Eloquent, transactions, policies, testing |
-| Frontend | **Vue 3 + Inertia.js** | UI dinamis tanpa membuat frontend API terpisah |
-| Database | **PostgreSQL** | Relational FK, transactions, row locking, numeric stock quantities |
-| Build | Vite | Aset Vue/CSS |
-| Auth | Laravel session auth (ditambahkan setelah Inventory) | Staff login sederhana |
-| QRIS | Provider QRIS dinamis (belum dipilih), sandbox/mock saat lokal | Pembayaran hanya dipercaya setelah verifikasi server |
+| Bagian   | Teknologi                                                      | Alasan                                                             |
+| -------- | -------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Backend  | **Laravel (PHP)**                                              | Routes, validation, Eloquent, transactions, policies, testing      |
+| Frontend | **Vue 3 + Inertia.js**                                         | UI dinamis tanpa membuat frontend API terpisah                     |
+| Database | **PostgreSQL**                                                 | Relational FK, transactions, row locking, numeric stock quantities |
+| Build    | Vite                                                           | Aset Vue/CSS                                                       |
+| Auth     | Laravel session auth (ditambahkan setelah Inventory)           | Staff login sederhana                                              |
+| QRIS     | Provider QRIS dinamis (belum dipilih), sandbox/mock saat lokal | Pembayaran hanya dipercaya setelah verifikasi server               |
 
 Gunakan project Laravel/Vue yang sudah berjalan. **Tidak wajib mengganti atau menginstal ulang starter kit**. Jika project dibuat tanpa starter auth, tambahkan login/session sederhana pada tahap Authentication.
 
@@ -34,14 +34,14 @@ Aplikasi merupakan **modular monolith**: folder biasa Laravel dengan pemisahan f
 
 ## 3. Tanggung jawab kode
 
-| Layer | Tanggung jawab | Jangan lakukan |
-|---|---|---|
-| **Vue/Inertia Page** | Form, validasi UX, tampilan harga/status dari server | Menentukan harga resmi, menandai payment paid |
-| **Routes + Controllers** | HTTP request, auth, panggil validation/business action, Inertia response | Menyimpan seluruh business logic kompleks di controller |
-| **Form Requests** | Validasi request & pilihan input | Percaya harga atau stok dari browser |
-| **Models/Eloquent** | Relasi, query yang mudah dibaca | Menaruh seluruh checkout/payment workflow pada model observer |
-| **Services/Actions** | Hanya untuk alur multi-record: checkout, stok, receiving, payment callback, kitchen transition | Membuat generic repository/CQRS/event sourcing tanpa kebutuhan |
-| **PostgreSQL** | FK, unique constraints, transactions, row locks, saldo konsisten | Menyimpan data historis yang bisa berubah tanpa snapshot |
+| Layer                    | Tanggung jawab                                                                                 | Jangan lakukan                                                 |
+| ------------------------ | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| **Vue/Inertia Page**     | Form, validasi UX, tampilan harga/status dari server                                           | Menentukan harga resmi, menandai payment paid                  |
+| **Routes + Controllers** | HTTP request, auth, panggil validation/business action, Inertia response                       | Menyimpan seluruh business logic kompleks di controller        |
+| **Form Requests**        | Validasi request & pilihan input                                                               | Percaya harga atau stok dari browser                           |
+| **Models/Eloquent**      | Relasi, query yang mudah dibaca                                                                | Menaruh seluruh checkout/payment workflow pada model observer  |
+| **Services/Actions**     | Hanya untuk alur multi-record: checkout, stok, receiving, payment callback, kitchen transition | Membuat generic repository/CQRS/event sourcing tanpa kebutuhan |
+| **PostgreSQL**           | FK, unique constraints, transactions, row locks, saldo konsisten                               | Menyimpan data historis yang bisa berubah tanpa snapshot       |
 
 Nama file/service fleksibel; yang wajib adalah **pemisahan tanggung jawabnya**, bukan menambah layer demi layer.
 
@@ -114,11 +114,11 @@ Jangan membuat frontend/backend dua repository terpisah untuk V1.
 
 **Setelah fitur bisnis, sebelum release:** akun staff dan fixed roles `owner`, `cashier`, `kitchen` + server-side gates/policies:
 
-| Aksi | Owner | Cashier | Kitchen |
-|---|:---:|:---:|:---:|
-| Menu/stock/supplier/purchases/staff/dashboard | ✓ | — | — |
-| Cashier POS / pembayaran cash | ✓ | ✓ | — |
-| Lihat/proses kitchen queue | ✓ | — | ✓ |
+| Aksi                                          | Owner | Cashier | Kitchen |
+| --------------------------------------------- | :---: | :-----: | :-----: |
+| Menu/stock/supplier/purchases/staff/dashboard |   ✓   |    —    |    —    |
+| Cashier POS / pembayaran cash                 |   ✓   |    ✓    |    —    |
+| Lihat/proses kitchen queue                    |   ✓   |    —    |    ✓    |
 
 Owner menangani stock/procurement di V1; tidak ada Manager/Inventory role khusus. Deactivated user ditolak dari staff actions.
 

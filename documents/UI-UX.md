@@ -21,16 +21,16 @@ Builder boleh mengubah susunan panel, jumlah kolom, ukuran komponen, posisi tind
 
 Simpan file berikut di `documents/references/`. Nama file memudahkan menemukan gambar; tidak menetapkan pasangan wajib satu gambar untuk satu halaman.
 
-| File | Inspirasi yang dapat dipakai lintas aplikasi |
-|---|---|
-| dashboard.png | Hierarki informasi, shell navigasi, komposisi ringkasan dan ruang kosong |
-| orders.png | Daftar yang mudah dipindai, pencarian/filter dan penanda status |
-| orders_detil.png | Pengelompokan informasi detail dan hierarki tindakan |
-| tables.png | Pengulangan kartu yang rapi dan identitas item yang jelas |
-| menus.png | Penyajian foto produk, harga dan kontrol pemilihan |
-| menus_form.png | Form berkelompok, upload gambar dan pemisahan informasi |
-| handling_menus.png | Hubungan navigasi kategori dengan daftar konten |
-| delete_modal.png | Dialog ringkas, penjelasan dampak dan tindakan konfirmasi |
+| File               | Inspirasi yang dapat dipakai lintas aplikasi                             |
+| ------------------ | ------------------------------------------------------------------------ |
+| dashboard.png      | Hierarki informasi, shell navigasi, komposisi ringkasan dan ruang kosong |
+| orders.png         | Daftar yang mudah dipindai, pencarian/filter dan penanda status          |
+| orders_detil.png   | Pengelompokan informasi detail dan hierarki tindakan                     |
+| tables.png         | Pengulangan kartu yang rapi dan identitas item yang jelas                |
+| menus.png          | Penyajian foto produk, harga dan kontrol pemilihan                       |
+| menus_form.png     | Form berkelompok, upload gambar dan pemisahan informasi                  |
+| handling_menus.png | Hubungan navigasi kategori dengan daftar konten                          |
+| delete_modal.png   | Dialog ringkas, penjelasan dampak dan tindakan konfirmasi                |
 
 ### 2.2 Prinsip adaptasi
 
@@ -59,21 +59,21 @@ Tampilan terang, bersih, ringkas, dominan putih dan abu sangat muda. Oranye mena
 
 Nilai berikut adalah baseline implementasi untuk menjaga konsistensi, bukan warna/font yang wajib identik dengan gambar. Builder dapat menyesuaikan token secara terpusat untuk kontras dan keterbacaan; hindari nilai berbeda-beda tanpa alasan pada tiap halaman.
 
-| Token | Nilai | Penggunaan |
-|---|---|---|
-| canvas | #F5F5F5 | Latar aplikasi |
-| surface | #FFFFFF | Sidebar, kartu, dialog |
-| text | #171717 | Teks utama |
-| text-muted | #616161 | Deskripsi, metadata |
-| border | #E5E5E5 | Pemisah, input, tabel |
-| accent | #F4511E | Ikon, grafik, aksen visual |
-| primary | #C63C0C | Tombol dengan teks putih, link aktif |
-| primary-hover | #A93209 | Hover tombol utama |
-| primary-soft | #FFF1E9 | Background navigasi/filter aktif |
-| success / soft | #166534 / #ECFDF3 | Pembayaran berhasil, completed |
-| warning / soft | #854D0E / #FEF9C3 | Pending, stok rendah |
-| info / soft | #1D4ED8 / #EFF6FF | Preparing, informasi |
-| danger / soft | #B91C1C / #FEF2F2 | Gagal, batal, tindakan destruktif |
+| Token          | Nilai             | Penggunaan                           |
+| -------------- | ----------------- | ------------------------------------ |
+| canvas         | #F5F5F5           | Latar aplikasi                       |
+| surface        | #FFFFFF           | Sidebar, kartu, dialog               |
+| text           | #171717           | Teks utama                           |
+| text-muted     | #616161           | Deskripsi, metadata                  |
+| border         | #E5E5E5           | Pemisah, input, tabel                |
+| accent         | #F4511E           | Ikon, grafik, aksen visual           |
+| primary        | #C63C0C           | Tombol dengan teks putih, link aktif |
+| primary-hover  | #A93209           | Hover tombol utama                   |
+| primary-soft   | #FFF1E9           | Background navigasi/filter aktif     |
+| success / soft | #166534 / #ECFDF3 | Pembayaran berhasil, completed       |
+| warning / soft | #854D0E / #FEF9C3 | Pending, stok rendah                 |
+| info / soft    | #1D4ED8 / #EFF6FF | Preparing, informasi                 |
+| danger / soft  | #B91C1C / #FEF2F2 | Gagal, batal, tindakan destruktif    |
 
 - Font: Inter jika tersedia, fallback `system-ui, sans-serif`. Body 14px/1.5; customer 16px; metadata minimal 12px; judul halaman 24px/600; judul section 16px/600; KPI 30–32px/600.
 - Angka harga memakai tabular numerals, rata kanan di tabel. Format `Rp25.000`; integer IDR, tanpa cents atau currency switcher.
@@ -84,12 +84,12 @@ Nilai berikut adalah baseline implementasi untuk menjaga konsistensi, bukan warn
 
 ### 3.2 Rekomendasi struktur layout
 
-| Area | Desktop ≥1280px | Tablet 768–1279px | Mobile <768px |
-|---|---|---|---|
-| Owner | Sidebar 224px, konten fleksibel | Sidebar drawer; tabel boleh scroll internal | Drawer; form satu kolom; daftar ringkas |
-| Cashier | Katalog + cart kanan 360px | Cart 320px jika ruang cukup; jika tidak, drawer | Katalog + tombol cart sticky; cart halaman/sheet |
-| Kitchen | Sidebar ringkas/drawer; grid tiket | Grid 2 kolom bila muat | Tiket satu kolom, filter status |
-| Customer | Konten terpusat max 720px | Layout customer yang sama | Mobile-first, padding 16px, CTA bawah |
+| Area     | Desktop ≥1280px                    | Tablet 768–1279px                               | Mobile <768px                                    |
+| -------- | ---------------------------------- | ----------------------------------------------- | ------------------------------------------------ |
+| Owner    | Sidebar 224px, konten fleksibel    | Sidebar drawer; tabel boleh scroll internal     | Drawer; form satu kolom; daftar ringkas          |
+| Cashier  | Katalog + cart kanan 360px         | Cart 320px jika ruang cukup; jika tidak, drawer | Katalog + tombol cart sticky; cart halaman/sheet |
+| Kitchen  | Sidebar ringkas/drawer; grid tiket | Grid 2 kolom bila muat                          | Tiket satu kolom, filter status                  |
+| Customer | Konten terpusat max 720px          | Layout customer yang sama                       | Mobile-first, padding 16px, CTA bawah            |
 
 Staff shell: sidebar putih, logo atas, navigasi tengah, akun+role+logout bawah. Header konten berisi judul, deskripsi singkat dan aksi kontekstual. Konten memakai sisa viewport; jangan meniru margin screenshot sebagai bingkai besar tetap.
 
@@ -97,33 +97,33 @@ Customer tidak memakai sidebar staff. Header berisi nama café dan label meja. F
 
 ## 4. Navigasi dan akses
 
-| Aktor | Navigasi |
-|---|---|
-| Owner | Dashboard, Menu, Inventory, Supplier, Pembelian, Meja & QR, Pesanan, POS, Kitchen, Staf |
-| Cashier | POS, transaksi terkait, akun/logout |
-| Kitchen | Antrean kitchen, akun/logout |
-| Customer | Menu meja, keranjang, pembayaran, status order miliknya |
+| Aktor    | Navigasi                                                                                |
+| -------- | --------------------------------------------------------------------------------------- |
+| Owner    | Dashboard, Menu, Inventory, Supplier, Pembelian, Meja & QR, Pesanan, POS, Kitchen, Staf |
+| Cashier  | POS, transaksi terkait, akun/logout                                                     |
+| Kitchen  | Antrean kitchen, akun/logout                                                            |
+| Customer | Menu meja, keranjang, pembayaran, status order miliknya                                 |
 
 Owner adalah role data resmi; `/admin` hanya nama area antarmuka, bukan role tambahan. Menu disembunyikan sesuai akses, dan Laravel tetap menolak request tanpa izin.
 
 Route berikut adalah rancangan navigasi, boleh mengikuti nama route existing selama perilaku sama:
 
-| Route usulan | Layar |
-|---|---|
-| /login | Login staff |
-| /admin | Dashboard owner |
-| /admin/menu | Produk, kategori, option groups |
-| /admin/inventory | Stok, detail movement, adjustment, resep |
-| /admin/suppliers | Supplier |
-| /admin/purchases | Daftar/detail/form pembelian |
-| /admin/tables | Meja & QR |
-| /admin/orders | Pesanan dan payment review owner |
-| /admin/staff | Akun staff |
-| /cashier | POS kasir |
-| /cashier/orders | Transaksi dalam cakupan akses kasir |
-| /kitchen | Antrean berbayar |
-| /t/{qr_token} | Menu meja publik |
-| /o/{public_token} | Pembayaran/status privat order |
+| Route usulan      | Layar                                    |
+| ----------------- | ---------------------------------------- |
+| /login            | Login staff                              |
+| /admin            | Dashboard owner                          |
+| /admin/menu       | Produk, kategori, option groups          |
+| /admin/inventory  | Stok, detail movement, adjustment, resep |
+| /admin/suppliers  | Supplier                                 |
+| /admin/purchases  | Daftar/detail/form pembelian             |
+| /admin/tables     | Meja & QR                                |
+| /admin/orders     | Pesanan dan payment review owner         |
+| /admin/staff      | Akun staff                               |
+| /cashier          | POS kasir                                |
+| /cashier/orders   | Transaksi dalam cakupan akses kasir      |
+| /kitchen          | Antrean berbayar                         |
+| /t/{qr_token}     | Menu meja publik                         |
+| /o/{public_token} | Pembayaran/status privat order           |
 
 Keranjang dapat menjadi state pada menu, bukan wajib route terpisah. Token meja tidak memberi akses ke daftar order pelanggan lain. Token order tidak ditampilkan pada daftar publik.
 
@@ -264,20 +264,20 @@ QRIS hanya tersedia setelah modul provider siap. Alurnya sama dengan guest; tida
 
 ### 9.2 Status resmi
 
-| Domain | Nilai data | Label UI | Semantik |
-|---|---|---|---|
-| Order | awaiting_payment | Menunggu pembayaran | Belum boleh dikerjakan kitchen |
-| Order | queued | Dalam antrean | Berbayar, menunggu dibuat |
-| Order | preparing | Sedang dibuat | Stok sudah dikonsumsi |
-| Order | ready | Siap | Siap ditindaklanjuti operasional |
-| Order | completed | Selesai | Pemrosesan selesai |
-| Order | cancelled | Dibatalkan | Bukan otomatis refund |
-| Order | payment_review | Perlu pemeriksaan | Owner menangani exception pembayaran |
-| Payment | pending | Menunggu | Belum terverifikasi |
-| Payment | paid | Dibayar | Terverifikasi |
-| Payment | failed | Gagal | Jangan masuk kitchen |
-| Payment | expired | Kedaluwarsa | Hold unpaid dibebaskan backend |
-| Payment | refunded | Dikembalikan | Hanya jika tercatat sah; bukan aksi refund otomatis |
+| Domain  | Nilai data       | Label UI            | Semantik                                            |
+| ------- | ---------------- | ------------------- | --------------------------------------------------- |
+| Order   | awaiting_payment | Menunggu pembayaran | Belum boleh dikerjakan kitchen                      |
+| Order   | queued           | Dalam antrean       | Berbayar, menunggu dibuat                           |
+| Order   | preparing        | Sedang dibuat       | Stok sudah dikonsumsi                               |
+| Order   | ready            | Siap                | Siap ditindaklanjuti operasional                    |
+| Order   | completed        | Selesai             | Pemrosesan selesai                                  |
+| Order   | cancelled        | Dibatalkan          | Bukan otomatis refund                               |
+| Order   | payment_review   | Perlu pemeriksaan   | Owner menangani exception pembayaran                |
+| Payment | pending          | Menunggu            | Belum terverifikasi                                 |
+| Payment | paid             | Dibayar             | Terverifikasi                                       |
+| Payment | failed           | Gagal               | Jangan masuk kitchen                                |
+| Payment | expired          | Kedaluwarsa         | Hold unpaid dibebaskan backend                      |
+| Payment | refunded         | Dikembalikan        | Hanya jika tercatat sah; bukan aksi refund otomatis |
 
 Selalu gunakan teks, tidak hanya warna. Paid dan Completed adalah fakta berbeda.
 
@@ -290,19 +290,19 @@ Selalu gunakan teks, tidak hanya warna. Paid dan Completed adalah fakta berbeda.
 
 ## 10. Komponen dan perilaku bersama
 
-| Komponen | Aturan |
-|---|---|
-| Primary button | Satu aksi utama per konteks; teks berupa tindakan; loading mencegah submit ulang |
-| Secondary button | Outline/netral untuk batal/kembali; tidak bersaing dengan primary |
-| Destructive button | Merah, bukan oranye brand; konfirmasi dampak konkret |
-| Input | Label permanen, helper seperlunya, error inline; placeholder bukan label |
-| Select/radio/checkbox | Sesuai single/multiple dan required; navigasi keyboard berfungsi |
-| Search/filter | Search icon opsional, clear filter, empty result berbeda dari dataset kosong |
-| Status badge | Label konsisten dan kontras; bukan tombol kecuali memang filter |
-| Dialog | Judul jelas, close, fokus terperangkap, Esc jika aman, fokus kembali ke pemicu |
-| Toast | Feedback sukses singkat; error kritis juga tampil inline, tidak hilang sendirian |
-| Data table | Header jelas, angka rata kanan, unit eksplisit; scroll hanya pada wrapper |
-| Product image | Rasio konsisten, object-fit cover, alt bermakna bila informatif |
+| Komponen              | Aturan                                                                           |
+| --------------------- | -------------------------------------------------------------------------------- |
+| Primary button        | Satu aksi utama per konteks; teks berupa tindakan; loading mencegah submit ulang |
+| Secondary button      | Outline/netral untuk batal/kembali; tidak bersaing dengan primary                |
+| Destructive button    | Merah, bukan oranye brand; konfirmasi dampak konkret                             |
+| Input                 | Label permanen, helper seperlunya, error inline; placeholder bukan label         |
+| Select/radio/checkbox | Sesuai single/multiple dan required; navigasi keyboard berfungsi                 |
+| Search/filter         | Search icon opsional, clear filter, empty result berbeda dari dataset kosong     |
+| Status badge          | Label konsisten dan kontras; bukan tombol kecuali memang filter                  |
+| Dialog                | Judul jelas, close, fokus terperangkap, Esc jika aman, fokus kembali ke pemicu   |
+| Toast                 | Feedback sukses singkat; error kritis juga tampil inline, tidak hilang sendirian |
+| Data table            | Header jelas, angka rata kanan, unit eksplisit; scroll hanya pada wrapper        |
+| Product image         | Rasio konsisten, object-fit cover, alt bermakna bila informatif                  |
 
 - Form tidak kehilangan isi karena error validasi. Field error pertama mendapat fokus; form panjang punya error summary bila bermanfaat.
 - Dirty form meminta konfirmasi saat pengguna sengaja pergi. Jangan tampilkan modal untuk setiap perubahan kecil.
@@ -311,19 +311,19 @@ Selalu gunakan teks, tidak hanya warna. Paid dan Completed adalah fakta berbeda.
 
 ## 11. Loading, empty, error dan koneksi
 
-| Kondisi | Tampilan/tindakan |
-|---|---|
-| Loading awal | Skeleton mengikuti layout; hindari angka demo |
-| Submit berjalan | Spinner dan label “Menyimpan…”/“Memproses…”; satu request aktif |
-| Data kosong | Penjelasan singkat + CTA sesuai izin, mis. Tambah produk |
-| Filter kosong | “Tidak ada hasil untuk filter ini” + Reset filter |
-| Stok berubah | Sebut item terdampak, pertahankan cart dan arahkan edit |
-| Jaringan putus | Banner persistent; status terakhir diberi waktu; jangan klaim offline POS |
-| Request timeout | Hasil belum diketahui; cek hasil server sebelum mengulang operasi keuangan |
-| 403 | Akses ditolak, link kembali ke area role |
-| Sesi berakhir | Pesan login kembali; jangan mengulang pembayaran otomatis |
+| Kondisi                | Tampilan/tindakan                                                                |
+| ---------------------- | -------------------------------------------------------------------------------- |
+| Loading awal           | Skeleton mengikuti layout; hindari angka demo                                    |
+| Submit berjalan        | Spinner dan label “Menyimpan…”/“Memproses…”; satu request aktif                  |
+| Data kosong            | Penjelasan singkat + CTA sesuai izin, mis. Tambah produk                         |
+| Filter kosong          | “Tidak ada hasil untuk filter ini” + Reset filter                                |
+| Stok berubah           | Sebut item terdampak, pertahankan cart dan arahkan edit                          |
+| Jaringan putus         | Banner persistent; status terakhir diberi waktu; jangan klaim offline POS        |
+| Request timeout        | Hasil belum diketahui; cek hasil server sebelum mengulang operasi keuangan       |
+| 403                    | Akses ditolak, link kembali ke area role                                         |
+| Sesi berakhir          | Pesan login kembali; jangan mengulang pembayaran otomatis                        |
 | Payment provider error | Status gagal membuat QR dibedakan dari gagal bayar; retry aman mengikuti backend |
-| QR invalid/nonaktif | Arahan hubungi kasir, tanpa daftar order/meja sensitif |
+| QR invalid/nonaktif    | Arahan hubungi kasir, tanpa daftar order/meja sensitif                           |
 
 ## 12. Accessibility dan bahasa
 
@@ -369,7 +369,6 @@ Jangan memasang menu kosong “Coming soon”, bell notifikasi, Help/Settings ge
 ## 15. Keputusan terbuka sebelum implementasi terkait
 
 Brand/logo final; provider QRIS dan kemampuan bayar pada ponsel yang sama; resep nyata; pajak/service charge dan struk; hak dan batas pembatalan order; basis threshold warning jika belum ditetapkan kode; serta penyimpanan penyelesaian manual payment review. Keputusan ini tidak menghambat implementasi shell, kategori dan menu dasar.
-
 
 ## 16. Arahan singkat untuk Builder
 
