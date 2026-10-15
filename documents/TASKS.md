@@ -2,7 +2,7 @@
 
 > **Ini tracker hasil fitur, bukan instruksi coding per file.**  
 > Status: **Todo → Doing → Done**. Semua masih **Todo** sampai diverifikasi di repository.  
-> **Fokus sekarang:** `03 — Inventory & Recipes`. Kerjakan **satu tahap aktif** pada satu waktu.
+> **Fokus sekarang:** `01 — Project Foundation`. Kerjakan **satu tahap aktif** pada satu waktu.
 
 ## 1. Progress
 
@@ -10,7 +10,7 @@
 |---|---|---|---|
 | 01 | F00 | Laravel + Vue/Inertia + PostgreSQL berjalan | Todo |
 | 02 | F02 | Menu kopi/pastry + variants/options berfungsi | Todo |
-| 03 | F03 | Ingredient inventory + coffee recipes berfungsi | In Progress |
+| 03 | F03 | Ingredient inventory + coffee recipes berfungsi | Todo |
 | 04 | FAUTH | Login/logout dasar untuk staff | Todo |
 | 05 | F07 | Supplier, purchasing, receiving sederhana | Todo |
 | 06 | F04 | Cashier POS cash dine-in/takeaway | Todo |
@@ -18,6 +18,8 @@
 | 08 | F05 | Table QR + QRIS verified (+ QRIS cashier) | Todo |
 | 09 | F01 | Employees + fixed roles authorization | Todo |
 | 10 | F09/F10 | Dashboard, testing & release hardening | Todo |
+|     |         |                                                 |        |
+|     |         |                                                 |        |
 
 ### Cara update
 
@@ -38,17 +40,13 @@
 
 ## 02 — Menu Management
 
-- [ ] Bisa tambah/edit/nonaktifkan kategori dan produk coffee/pastry.
-- [ ] Bisa membuat varian Hot/Iced atau Regular beserta harga.
-- [ ] Bisa mengatur Sugar Level per produk; Laravel menolak opsi tidak valid dan menghitung harga sendiri.
+- [x] Bisa tambah/edit/nonaktifkan kategori dan produk coffee/pastry.
+- [x] Bisa membuat varian Hot/Iced atau Regular beserta harga.
+- [x] Bisa mengatur Sugar Level per produk; Laravel menolak opsi tidak valid dan menghitung harga sendiri.
 
 **Done jika:** Iced Americano + Low Sugar dan Croissant Regular muncul dengan harga tepat.
 
 ## 03 — Inventory & Recipes
-
-**Sub-stage:** Awaiting UI Approval. Prototipe stok, tambah/edit item, adjustment, detail/riwayat movement, resep per varian, tambahan sugar, hubungan pastry pcs, dan kalkulator kebutuhan memakai data contoh lokal. Sidebar dikelompokkan; modul berikutnya berupa placeholder alur sesuai permintaan pengguna. Belum ada integrasi backend Inventory atau perubahan database.
-
-**Evidence UI prototype (15 Oktober 2026):** `npm run types:check`, `npm run build`, pemeriksaan `vp check` pada 10 file UI, `vendor/bin/pint --dirty --format agent`, dan `git diff --check` lulus. Pemeriksaan browser/responsif belum dilakukan karena tool browser tidak memiliki sesi tersedia. Menunggu review dan persetujuan UI pengguna; basis warning stok rendah final belum diputuskan (prototipe diberi label ilustrasi).
 
 - [ ] Bisa mengelola bahan (g/ml) dan pastry jadi (pcs), melihat saldo serta low-stock warning.
 - [ ] Bisa mengatur resep per variant coffee dan penambahan syrup berdasarkan Sugar Level.
@@ -120,11 +118,11 @@
 
 | Field | Isi |
 |---|---|
-| Current stage | **03 — F03 Inventory & Recipes** |
-| Status | **In Progress · Awaiting UI Approval** |
-| Next outcome | Pengguna meninjau dan menyetujui UI sebelum backend Inventory |
-| Blocker | Persetujuan UI pending; browser visual QA belum tersedia; basis warning final perlu keputusan sebelum integrasi |
-| Last verification | 15 Oktober 2026: build, TypeScript, lint/format file UI, Pint dan diff check lulus; browser QA belum dijalankan |
+| Current stage | **01 — F00 Project Foundation** |
+| Status | **Todo** |
+| Next outcome | Laravel + Vue/Inertia + PostgreSQL jalan di local |
+| Blocker | Tidak ada yang dikonfirmasi; inspeksi repository dulu |
+| Last verification | Belum ada |
 
 **Keputusan tertunda:** provider QRIS, resep bahan riil, tax/service, hosting — dicatat di PRD; baru dianggap blocker jika sudah menghambat tahap aktif.
 

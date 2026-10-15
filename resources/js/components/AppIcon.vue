@@ -17,6 +17,11 @@ const paths: Record<string, string> = {
     back: 'M19 12H5m6-6-6 6 6 6',
     trash: 'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7',
     info: 'M12 11v6m0-10h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z',
+    history: 'M3 11a9 9 0 1 1 2 7M3 4v7h7M12 7v5l3 2',
+    purchase: 'M3 4h2l3 12h11l3-9H6M9 21h.01M18 21h.01',
+    orders: 'M6 3h12v19l-3-2-3 2-3-2-3 2V3ZM9 7h6M9 11h6M9 15h3',
+    pos: 'M3 3h18v13H3zM8 21h8M12 16v5M7 7h10M7 11h5',
+    staff: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M16 3a4 4 0 0 1 0 8M22 21v-2a4 4 0 0 0-3-3.87M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z',
 };
 </script>
 
