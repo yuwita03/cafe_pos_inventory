@@ -1,0 +1,2 @@
+This worktree works!
+Test change in feat-inventory.
