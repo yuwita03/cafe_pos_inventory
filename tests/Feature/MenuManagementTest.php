@@ -5,6 +5,7 @@ use App\Models\Option;
 use App\Models\OptionGroup;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\User;
 use App\ProductImage;
 use Database\Seeders\MenuSeeder;
 use Illuminate\Database\Schema\Blueprint;
@@ -13,6 +14,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+
+beforeEach(function () {
+    $this->actingAs(User::factory()->create(['role' => 'owner']));
+});
 
 /** @return array<string, mixed> */
 function menuProductPayload(Category $category): array

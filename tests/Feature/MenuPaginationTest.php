@@ -4,8 +4,13 @@ use App\Models\Category;
 use App\Models\OptionGroup;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Inertia\Testing\AssertableInertia as Assert;
+
+beforeEach(function () {
+    $this->actingAs(User::factory()->create(['role' => 'owner']));
+});
 
 test('product table is limited ordered and paginated in the database', function (): void {
     $category = Category::factory()->create();

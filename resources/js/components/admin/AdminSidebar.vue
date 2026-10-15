@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { Link, usePage } from '@inertiajs/vue3';
+import { Form, Link, usePage } from '@inertiajs/vue3';
 import { computed, ref, useId, watch } from 'vue';
 import AppIcon from '@/components/AppIcon.vue';
 import { adminNavigation } from '@/lib/adminNavigation';
+import { logout } from '@/routes';
 const emit = defineEmits<{ navigate: [] }>();
 const page = usePage();
 const currentPath = computed(() => page.url.split('?')[0]);
@@ -125,15 +126,76 @@ function toggleGroup(label: string): void {
                         ('prototype' in currentItem ||
                             'placeholder' in currentItem)
                             ? 'Data contoh atau placeholder. Belum ada aksi operasional nyata.'
-                            : 'Data tersimpan. Login staf belum diaktifkan.'
+                            : 'Data tersimpan. Akses menggunakan akun staf.'
                     }}
                 </p>
             </div>
             <div class="sidebar-profile">
-                <span class="avatar">O</span>
-                <div>Owner<small>Profil contoh · Admin</small></div>
-                <span class="profile-dot" />
+                <span class="avatar">{{
+                    page.props.auth.user?.name.slice(0, 1).toUpperCase()
+                }}</span>
+                <div class="sidebar-account">
+                    <span :title="page.props.auth.user?.name">{{
+                        page.props.auth.user?.name
+                    }}</span>
+                    <small>{{ page.props.auth.user?.role }}</small>
+                </div>
+                <Form
+                    v-slot="{ processing }"
+                    :action="logout()"
+                    class="sidebar-logout-form"
+                    @success="emit('navigate')"
+                >
+                    <button
+                        type="submit"
+                        class="sidebar-logout"
+                        :disabled="processing"
+                        :aria-busy="processing"
+                        aria-label="Keluar dari akun"
+                        title="Keluar dari akun"
+                    >
+                        <AppIcon name="logout" :size="18" />
+                        <span>{{ processing ? 'Proses…' : 'Keluar' }}</span>
+                    </button>
+                </Form>
             </div>
         </div>
     </div>
 </template>
+
+<style scoped>
+.sidebar-account {
+    flex: 1;
+    min-width: 0;
+}
+.sidebar-account > span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.sidebar-profile .avatar,
+.sidebar-logout-form {
+    flex-shrink: 0;
+}
+.sidebar-logout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 48px;
+    min-height: 48px;
+    padding: 6px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--primary);
+}
+.sidebar-logout span {
+    font-size: 11px;
+}
+.sidebar-logout:hover:not(:disabled) {
+    background: var(--soft);
+}
+</style>

@@ -15,6 +15,7 @@ const paths: Record<string, string> = {
     upload: 'M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5',
     check: 'm5 12 4 4L19 6',
     back: 'M19 12H5m6-6-6 6 6 6',
+    logout: 'M9 4H4v16h5M10 12h10m-4-4 4 4-4 4',
     trash: 'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7',
     info: 'M12 11v6m0-10h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z',
     history: 'M3 11a9 9 0 1 1 2 7M3 4v7h7M12 7v5l3 2',
