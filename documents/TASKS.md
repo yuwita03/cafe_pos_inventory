@@ -6,18 +6,18 @@
 
 ## 1. Progress
 
-| No. | ID | Tahap / hasil yang diharapkan | Status |
-|---|---|---|---|
-| 01 | F00 | Laravel + Vue/Inertia + PostgreSQL berjalan | Todo |
-| 02 | F02 | Menu kopi/pastry + variants/options berfungsi | Todo |
-| 03 | F03 | Ingredient inventory + coffee recipes berfungsi | Todo |
-| 04 | FAUTH | Login/logout dasar untuk staff | Todo |
-| 05 | F07 | Supplier, purchasing, receiving sederhana | Todo |
-| 06 | F04 | Cashier POS cash dine-in/takeaway | Todo |
-| 07 | F06 | Kitchen queue + potong stok sekali | Todo |
-| 08 | F05 | Table QR + QRIS verified (+ QRIS cashier) | Todo |
-| 09 | F01 | Employees + fixed roles authorization | Todo |
-| 10 | F09/F10 | Dashboard, testing & release hardening | Todo |
+| No. | ID      | Tahap / hasil yang diharapkan                   | Status |
+| --- | ------- | ----------------------------------------------- | ------ |
+| 01  | F00     | Laravel + Vue/Inertia + PostgreSQL berjalan     | Todo   |
+| 02  | F02     | Menu kopi/pastry + variants/options berfungsi   | Todo   |
+| 03  | F03     | Ingredient inventory + coffee recipes berfungsi | Todo   |
+| 04  | FAUTH   | Login/logout dasar untuk staff                  | Todo   |
+| 05  | F07     | Supplier, purchasing, receiving sederhana       | Todo   |
+| 06  | F04     | Cashier POS cash dine-in/takeaway               | Todo   |
+| 07  | F06     | Kitchen queue + potong stok sekali              | Todo   |
+| 08  | F05     | Table QR + QRIS verified (+ QRIS cashier)       | Todo   |
+| 09  | F01     | Employees + fixed roles authorization           | Todo   |
+| 10  | F09/F10 | Dashboard, testing & release hardening          | Todo   |
 |     |         |                                                 |        |
 |     |         |                                                 |        |
 
@@ -26,7 +26,7 @@
 1. Pilih tahap **Todo** pertama yang dependency-nya terpenuhi; ubah menjadi **Doing**.
 2. Centang checklist setelah perilakunya dicoba di UI **dan** test relevan dijalankan; jangan hanya karena AI menulis kode.
 3. Tahap **Done** bila semua checklist terpenuhi dan acceptance di bawahnya lulus; jika gagal, tulis blocker dan tetap **Doing**.
-4. **Catatan blocker** hanya hal yang menghambat *tahap aktif*; jangan membuat backlog teknis panjang di sini.
+4. **Catatan blocker** hanya hal yang menghambat _tahap aktif_; jangan membuat backlog teknis panjang di sini.
 
 ---
 
@@ -116,13 +116,13 @@
 
 ## 2. Current work / blocker
 
-| Field | Isi |
-|---|---|
-| Current stage | **01 — F00 Project Foundation** |
-| Status | **Todo** |
-| Next outcome | Laravel + Vue/Inertia + PostgreSQL jalan di local |
-| Blocker | Tidak ada yang dikonfirmasi; inspeksi repository dulu |
-| Last verification | Belum ada |
+| Field             | Isi                                                   |
+| ----------------- | ----------------------------------------------------- |
+| Current stage     | **01 — F00 Project Foundation**                       |
+| Status            | **Todo**                                              |
+| Next outcome      | Laravel + Vue/Inertia + PostgreSQL jalan di local     |
+| Blocker           | Tidak ada yang dikonfirmasi; inspeksi repository dulu |
+| Last verification | Belum ada                                             |
 
 **Keputusan tertunda:** provider QRIS, resep bahan riil, tax/service, hosting — dicatat di PRD; baru dianggap blocker jika sudah menghambat tahap aktif.
 

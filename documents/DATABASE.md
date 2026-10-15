@@ -66,28 +66,28 @@ Notasi: `PK` primary key, `FK` foreign key, `?` nullable, `UQ` unique. Semua tab
 
 ### A. Menu
 
-| Tabel | Kolom penting | Kegunaan |
-|---|---|---|
-| `categories` | `id` PK, `name` UQ, `is_active` bool | Coffee, Pastry, Non-Coffee |
-| `products` | `id` PK, `category_id` FK, `name`, `description?`, `image_path?`, `is_active` | Identitas produk, bukan harga |
-| `product_variants` | `id` PK, `product_id` FK, `stock_item_id?` FK, `name`, `price_idr` bigint, `is_available` | Hot, Iced, Regular, dan harga |
-| `option_groups` | `id` PK, `name` UQ, `selection_type` (`single`/`multiple`), `is_active` | Sugar Level, Extras |
-| `options` | `id` PK, `option_group_id` FK, `name`, `price_delta_idr` bigint, `is_active` | Zero/Low/Medium/High |
-| `product_option_groups` | `product_id` PK/FK, `option_group_id` PK/FK, `is_required` bool | Pilihan yang boleh dipakai per produk |
+| Tabel                   | Kolom penting                                                                             | Kegunaan                              |
+| ----------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------- |
+| `categories`            | `id` PK, `name` UQ, `is_active` bool                                                      | Coffee, Pastry, Non-Coffee            |
+| `products`              | `id` PK, `category_id` FK, `name`, `description?`, `image_path?`, `is_active`             | Identitas produk, bukan harga         |
+| `product_variants`      | `id` PK, `product_id` FK, `stock_item_id?` FK, `name`, `price_idr` bigint, `is_available` | Hot, Iced, Regular, dan harga         |
+| `option_groups`         | `id` PK, `name` UQ, `selection_type` (`single`/`multiple`), `is_active`                   | Sugar Level, Extras                   |
+| `options`               | `id` PK, `option_group_id` FK, `name`, `price_delta_idr` bigint, `is_active`              | Zero/Low/Medium/High                  |
+| `product_option_groups` | `product_id` PK/FK, `option_group_id` PK/FK, `is_required` bool                           | Pilihan yang boleh dipakai per produk |
 
 **Menu constraints:** unique `(product_id, name)` di variant dan `(option_group_id, name)` di options. Product punya ≥1 variant (divalidasi saat publikasi). Harga dan delta >= 0. Untuk pastry tanpa opsi, simpan variant `Regular` dan sembunyikan pemilih varian di UI. Menu diurutkan alfabetis; belum ada `display_order`.
 
 ### B. Inventory dan purchasing
 
-| Tabel | Kolom penting | Kegunaan |
-|---|---|---|
-| `stock_items` | `id` PK, `name` UQ, `base_unit` (`g`/`ml`/`pcs`), `on_hand_qty` numeric(12,3), `reorder_point` numeric(12,3), `is_active` | Saldo bahan atau pastry jadi |
-| `recipe_items` | `id` PK, `product_variant_id` FK, `stock_item_id` FK, `quantity` numeric(12,3) | Bahan per satu variant coffee |
-| `option_ingredients` | `id` PK, `option_id` FK, `stock_item_id` FK, `additional_qty` numeric(12,3) | Tambahan syrup sesuai sugar level |
-| `stock_movements` | `id` PK, `stock_item_id` FK, `quantity_delta` numeric(12,3), `reason`, `source_key` UQ, `actor_user_id?` FK, `created_at` | Riwayat tambah/kurang stok yang tidak diedit |
-| `suppliers` | `id` PK, `name`, `contact?`, `is_active` | Vendor bahan/pastry |
-| `purchases` | `id` PK, `supplier_id` FK, `status`, `created_by_user_id` FK, `received_by_user_id?` FK, `received_at?`, `created_at` | Header pembelian, `draft/received/cancelled` |
-| `purchase_items` | `id` PK, `purchase_id` FK, `stock_item_id` FK, `quantity` numeric(12,3), `line_cost_idr` bigint | Jumlah dalam satuan dasar + total biaya baris |
+| Tabel                | Kolom penting                                                                                                             | Kegunaan                                      |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `stock_items`        | `id` PK, `name` UQ, `base_unit` (`g`/`ml`/`pcs`), `on_hand_qty` numeric(12,3), `reorder_point` numeric(12,3), `is_active` | Saldo bahan atau pastry jadi                  |
+| `recipe_items`       | `id` PK, `product_variant_id` FK, `stock_item_id` FK, `quantity` numeric(12,3)                                            | Bahan per satu variant coffee                 |
+| `option_ingredients` | `id` PK, `option_id` FK, `stock_item_id` FK, `additional_qty` numeric(12,3)                                               | Tambahan syrup sesuai sugar level             |
+| `stock_movements`    | `id` PK, `stock_item_id` FK, `quantity_delta` numeric(12,3), `reason`, `source_key` UQ, `actor_user_id?` FK, `created_at` | Riwayat tambah/kurang stok yang tidak diedit  |
+| `suppliers`          | `id` PK, `name`, `contact?`, `is_active`                                                                                  | Vendor bahan/pastry                           |
+| `purchases`          | `id` PK, `supplier_id` FK, `status`, `created_by_user_id` FK, `received_by_user_id?` FK, `received_at?`, `created_at`     | Header pembelian, `draft/received/cancelled`  |
+| `purchase_items`     | `id` PK, `purchase_id` FK, `stock_item_id` FK, `quantity` numeric(12,3), `line_cost_idr` bigint                           | Jumlah dalam satuan dasar + total biaya baris |
 
 **Inventory constraints:** `quantity > 0`, `additional_qty >= 0`, `on_hand_qty >= 0`, `line_cost_idr >= 0`. Unique `(product_variant_id, stock_item_id)` dan `(option_id, stock_item_id)` untuk resep; unique `(purchase_id, stock_item_id)` untuk pembelian sederhana V1.
 
@@ -97,15 +97,15 @@ Notasi: `PK` primary key, `FK` foreign key, `?` nullable, `UQ` unique. Semua tab
 
 ### C. Order, staff & payment
 
-| Tabel | Kolom penting | Kegunaan |
-|---|---|---|
-| `users` | `id` PK, `name`, `email` UQ, `password`, `role` (`owner/cashier/kitchen`), `is_active` | Akun pegawai + fixed role |
-| `cafe_tables` | `id` PK, `label` UQ, `qr_token` UQ, `is_active` | QR unik per meja |
-| `orders` | `id` PK, `table_id?` FK, `created_by_user_id?` FK, `source`, `fulfillment_type`, `status`, `public_token` UQ, `checkout_key` UQ, `total_idr` bigint, `notes?`, `created_at` | QR/cashier masuk tabel yang sama |
-| `order_items` | `id` PK, `order_id` FK, `product_variant_id` FK, `product_name_snapshot`, `variant_name_snapshot`, `unit_price_idr` bigint, `quantity` int | Detail dengan harga beku |
-| `order_item_options` | `id` PK, `order_item_id` FK, `option_id` FK, `option_name_snapshot`, `price_delta_idr` bigint | Opsi terpilih dengan snapshot |
-| `payments` | `id` PK, `order_id` FK, `method` (`cash/qris`), `provider?`, `provider_reference?` UQ, `amount_idr` bigint, `status`, `paid_at?`, `created_at` | Satu order bisa punya beberapa attempt QRIS, satu pembayaran sukses |
-| `stock_reservations` | `id` PK, `order_id` FK, `stock_item_id` FK, `quantity` numeric(12,3), `status` (`active/consumed/released`), `expires_at?` | Hold stok hasil agregasi kebutuhan order |
+| Tabel                | Kolom penting                                                                                                                                                               | Kegunaan                                                            |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `users`              | `id` PK, `name`, `email` UQ, `password`, `role` (`owner/cashier/kitchen`), `is_active`                                                                                      | Akun pegawai + fixed role                                           |
+| `cafe_tables`        | `id` PK, `label` UQ, `qr_token` UQ, `is_active`                                                                                                                             | QR unik per meja                                                    |
+| `orders`             | `id` PK, `table_id?` FK, `created_by_user_id?` FK, `source`, `fulfillment_type`, `status`, `public_token` UQ, `checkout_key` UQ, `total_idr` bigint, `notes?`, `created_at` | QR/cashier masuk tabel yang sama                                    |
+| `order_items`        | `id` PK, `order_id` FK, `product_variant_id` FK, `product_name_snapshot`, `variant_name_snapshot`, `unit_price_idr` bigint, `quantity` int                                  | Detail dengan harga beku                                            |
+| `order_item_options` | `id` PK, `order_item_id` FK, `option_id` FK, `option_name_snapshot`, `price_delta_idr` bigint                                                                               | Opsi terpilih dengan snapshot                                       |
+| `payments`           | `id` PK, `order_id` FK, `method` (`cash/qris`), `provider?`, `provider_reference?` UQ, `amount_idr` bigint, `status`, `paid_at?`, `created_at`                              | Satu order bisa punya beberapa attempt QRIS, satu pembayaran sukses |
+| `stock_reservations` | `id` PK, `order_id` FK, `stock_item_id` FK, `quantity` numeric(12,3), `status` (`active/consumed/released`), `expires_at?`                                                  | Hold stok hasil agregasi kebutuhan order                            |
 
 `orders.source`: `cashier` / `table_qr`. `fulfillment_type`: `dine_in` / `takeaway`. `orders.status`: `awaiting_payment`, `queued`, `preparing`, `ready`, `completed`, `cancelled`, `payment_review`. `payments.status`: `pending`, `paid`, `failed`, `expired`, `refunded`.
 
@@ -113,15 +113,15 @@ Notasi: `PK` primary key, `FK` foreign key, `?` nullable, `UQ` unique. Semua tab
 
 ## 4. Transaksi dan integritas (penting)
 
-| Event | Harus atomik / idempotent |
-|---|---|
-| **Checkout** | Lock stock items, kalkulasi harga di server, validasi available, simpan order + snapshot + reservasi. Ulang request dengan checkout key sama menghasilkan order yang sama. |
-| **Cash confirmed** | Simpan paid cash payment + tandai order `queued` sekali. Cashier tidak dapat membuat paid order via URL guest. |
-| **QRIS callback** | Verifikasi signature, reference, amount, currency; lock order/payment; callback duplikat tidak membuat paid/queued kedua kali. |
-| **Expiry** | Payment/order unpaid expired => release hold; jika provider ternyata sudah menerima uang setelah release, `payment_review`, jangan langsung masuk kitchen. |
-| **Kitchen preparing** | Lock order & stock; update `queued -> preparing`; kurangi `on_hand_qty`, tulis stock movements dengan source key unik, tandai reservations consumed, sekali saja. |
-| **Purchase receive** | Lock purchase + stock; tambah saldo dan movement; ubah ke received dalam transaksi yang sama; request kedua ditolak/dianggap sudah processed. |
-| **Stock adjust** | Perlu alasan; update saldo dan movement beserta aktor dalam satu transaksi. |
+| Event                 | Harus atomik / idempotent                                                                                                                                                  |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Checkout**          | Lock stock items, kalkulasi harga di server, validasi available, simpan order + snapshot + reservasi. Ulang request dengan checkout key sama menghasilkan order yang sama. |
+| **Cash confirmed**    | Simpan paid cash payment + tandai order `queued` sekali. Cashier tidak dapat membuat paid order via URL guest.                                                             |
+| **QRIS callback**     | Verifikasi signature, reference, amount, currency; lock order/payment; callback duplikat tidak membuat paid/queued kedua kali.                                             |
+| **Expiry**            | Payment/order unpaid expired => release hold; jika provider ternyata sudah menerima uang setelah release, `payment_review`, jangan langsung masuk kitchen.                 |
+| **Kitchen preparing** | Lock order & stock; update `queued -> preparing`; kurangi `on_hand_qty`, tulis stock movements dengan source key unik, tandai reservations consumed, sekali saja.          |
+| **Purchase receive**  | Lock purchase + stock; tambah saldo dan movement; ubah ke received dalam transaksi yang sama; request kedua ditolak/dianggap sudah processed.                              |
+| **Stock adjust**      | Perlu alasan; update saldo dan movement beserta aktor dalam satu transaksi.                                                                                                |
 
 **Saldo:** semua perubahan `on_hand_qty` hanya melalui satu jalur service/DB transaction. Saat hitung stok tersedia, lock baris `stock_items` dalam urutan ID konsisten. Hold aktif order **berbayar** tidak di-expire otomatis hanya karena kitchen lambat (`expires_at = NULL` setelah paid). Setelah cancellation sebelum preparing, release. Setelah preparing, jangan restore otomatis.
 
