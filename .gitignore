@@ -10,8 +10,11 @@
 /resources/js/wayfinder
 /storage/*.key
 /storage/pail
+/refferences
+/documents
 /vendor
 .env
+.env.testing
 .env.backup
 .env.production
 .phpactor.json
