@@ -29,6 +29,10 @@ final class InventoryStock
             if ($balance < 0 || $balance > StockQuantity::MAX_MILLI) {
                 throw ValidationException::withMessages(['quantity_delta' => 'Hasil stok harus antara 0 dan 999999999.999.']);
             }
+            $reserved = DB::table('stock_reservations')->where('stock_item_id', $item->id)->where('status', 'active')->sum('quantity');
+            if ($balance < StockQuantity::milli((string) $reserved)) {
+                throw ValidationException::withMessages(['quantity_delta' => 'Saldo tidak boleh lebih kecil dari stok yang direservasi pesanan.']);
+            }
             $item->update(['on_hand_qty' => StockQuantity::decimal($balance)]);
 
             return $item->movements()->create([
