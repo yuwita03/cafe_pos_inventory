@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\InventoryRequirementsRequest;
 use App\Http\Requests\Admin\SaveOptionIngredientsRequest;
 use App\Http\Requests\Admin\SaveStockItemRequest;
 use App\Http\Requests\Admin\SaveVariantRecipeRequest;
+use App\Http\Requests\Admin\SetStockQuickAddRequest;
 use App\InventoryRequirements;
 use App\InventoryStock;
 use App\Models\Option;
@@ -18,6 +19,7 @@ use App\Models\ProductVariant;
 use App\Models\RecipeItem;
 use App\Models\StockItem;
 use App\Models\StockMovement;
+use App\ProductStockConfiguration;
 use App\StockQuantity;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -32,6 +34,7 @@ class InventoryController extends Controller
 {
     public function index(Request $request): Response
     {
+        $reservations = DB::table('stock_reservations')->where('status', 'active')->groupBy('stock_item_id')->selectRaw('stock_item_id, SUM(quantity) AS quantity')->pluck('quantity', 'stock_item_id');
         $variants = ProductVariant::with('recipeItems')->get();
         $recipes = [];
         foreach ($variants as $variant) {
@@ -45,13 +48,13 @@ class InventoryController extends Controller
             'section' => $request->route('section', 'stock'),
             'stockItems' => StockItem::orderBy('name')->orderBy('id')->get()->map(fn (StockItem $item): array => [
                 'id' => $item->id, 'name' => $item->name, 'unit' => $item->base_unit,
-                'onHand' => (float) $item->on_hand_qty, 'reserved' => 0, 'available' => (float) $item->on_hand_qty,
-                'threshold' => (float) $item->reorder_point, 'active' => $item->is_active,
-                'lowStock' => $item->is_active && StockQuantity::milli($item->on_hand_qty) <= StockQuantity::milli($item->reorder_point),
+                'onHand' => (float) $item->on_hand_qty, 'reserved' => (float) ($reservations[$item->id] ?? 0), 'available' => (StockQuantity::milli($item->on_hand_qty) - StockQuantity::milli($reservations[$item->id] ?? '0')) / 1000,
+                'threshold' => (float) $item->reorder_point, 'active' => $item->is_active, 'quickAdd' => $item->is_quick_add,
+                'lowStock' => $item->is_active && StockQuantity::milli($item->on_hand_qty) - StockQuantity::milli($reservations[$item->id] ?? '0') <= StockQuantity::milli($item->reorder_point),
             ]),
             'stockMovements' => StockMovement::with('actor')->orderByDesc('created_at')->orderByDesc('id')->get()->map(fn (StockMovement $movement): array => [
                 'id' => $movement->id, 'stockId' => $movement->stock_item_id, 'delta' => (float) $movement->quantity_delta,
-                'reason' => $movement->reason, 'source' => 'Adjustment', 'actor' => $movement->actor->name ?? 'Tanpa akun (lokal)',
+                'reason' => $movement->reason, 'source' => str_starts_with($movement->reason, 'Order ORD-') ? 'Penjualan' : 'Adjustment', 'actor' => $movement->actor->name ?? 'Tanpa akun (lokal)',
                 'time' => $movement->created_at->timezone(config('app.timezone'))->format('d M Y H:i T'),
             ]),
             'variantRecipes' => $recipes,
@@ -94,10 +97,27 @@ class InventoryController extends Controller
             if ($data['base_unit'] !== $item->base_unit) {
                 throw ValidationException::withMessages(['base_unit' => 'Unit dasar item yang sudah dibuat tidak dapat diubah.']);
             }
+            if (! $data['is_active'] && DB::table('stock_reservations')->where('stock_item_id', $item->id)->where('status', 'active')->exists()) {
+                throw ValidationException::withMessages(['is_active' => 'Item masih direservasi pesanan aktif dan belum dapat dinonaktifkan.']);
+            }
             $item->update($data);
         });
 
         return back()->with('success', 'Item stok berhasil diperbarui.');
+    }
+
+    public function quickAdd(SetStockQuickAddRequest $request, StockItem $stockItem): RedirectResponse
+    {
+        DB::transaction(function () use ($request, $stockItem): void {
+            $item = StockItem::query()->lockForUpdate()->findOrFail($stockItem->id);
+            $enabled = $request->boolean('is_quick_add');
+            if ($enabled && $item->base_unit === 'pcs') {
+                throw ValidationException::withMessages(['is_quick_add' => 'Tambah cepat bahan hanya tersedia untuk item dengan unit g atau ml.']);
+            }
+            $item->update(['is_quick_add' => $enabled]);
+        });
+
+        return back()->with('success', 'Preferensi tambah cepat disimpan.');
     }
 
     public function adjust(AdjustStockRequest $request, InventoryStock $stock): RedirectResponse
@@ -118,17 +138,9 @@ class InventoryController extends Controller
     public function saveRecipe(SaveVariantRecipeRequest $request, ProductVariant $variant): RedirectResponse
     {
         $data = $request->validated();
-        DB::transaction(function () use ($data, $variant): void {
+        DB::transaction(function () use ($data, $variant, $request): void {
             $variant = ProductVariant::query()->lockForUpdate()->findOrFail($variant->id);
-            $ids = $data['kind'] === 'finished' ? [(int) $data['stock_item_id']] : array_column($data['ingredients'], 'stock_item_id');
-            $this->lockIngredients($ids, $data['kind'] === 'finished' ? ['pcs'] : ['g', 'ml']);
-            $variant->recipeItems()->delete();
-            $variant->update(['stock_item_id' => $data['kind'] === 'finished' ? $data['stock_item_id'] : null]);
-            if ($data['kind'] === 'ingredients') {
-                foreach ($data['ingredients'] as $row) {
-                    $variant->recipeItems()->create(['stock_item_id' => $row['stock_item_id'], 'quantity' => StockQuantity::decimal(StockQuantity::milli($row['quantity']))]);
-                }
-            }
+            app(ProductStockConfiguration::class)->save($variant, ['kind' => 'ingredients', 'ingredients' => $data['ingredients']], false, $request->user()?->id);
         }, 3);
 
         return back()->with('success', 'Konfigurasi stok varian berhasil disimpan.');

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\CashOrderController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\MenuController;
@@ -25,12 +26,19 @@ if (app()->environment('local', 'testing')) {
         Route::get('/admin/inventory/history', [InventoryController::class, 'index'])->defaults('section', 'history')->name('admin.inventory.history');
         Route::post('/admin/inventory/items', [InventoryController::class, 'store'])->name('admin.inventory.items.store');
         Route::put('/admin/inventory/items/{stockItem}', [InventoryController::class, 'update'])->name('admin.inventory.items.update');
+        Route::patch('/admin/inventory/items/{stockItem}/quick-add', [InventoryController::class, 'quickAdd'])->name('admin.inventory.items.quickAdd');
         Route::post('/admin/inventory/adjustments', [InventoryController::class, 'adjust'])->name('admin.inventory.adjustments');
         Route::put('/admin/inventory/recipes/{variant}', [InventoryController::class, 'saveRecipe'])->name('admin.inventory.recipe');
         Route::put('/admin/inventory/option-ingredients/{option}', [InventoryController::class, 'saveOption'])->name('admin.inventory.option');
         Route::post('/admin/inventory/requirements', [InventoryController::class, 'requirements'])->name('admin.inventory.requirements');
 
-        foreach (['suppliers', 'purchases', 'tables', 'orders', 'staff', 'pos', 'kitchen'] as $module) {
+        Route::get('/admin/pos', [CashOrderController::class, 'pos'])->name('admin.pos');
+        Route::post('/admin/pos/checkout', [CashOrderController::class, 'checkout'])->name('admin.pos.checkout');
+        Route::get('/admin/orders', [CashOrderController::class, 'orders'])->name('admin.orders');
+        Route::get('/admin/kitchen', [CashOrderController::class, 'kitchen'])->name('admin.kitchen');
+        Route::post('/admin/kitchen/orders/{order}/advance', [CashOrderController::class, 'advance'])->name('admin.kitchen.advance');
+
+        foreach (['suppliers', 'purchases', 'tables', 'staff'] as $module) {
             Route::inertia('/admin/'.$module, 'admin/Workflow', ['module' => $module])->name('admin.'.$module);
         }
 
