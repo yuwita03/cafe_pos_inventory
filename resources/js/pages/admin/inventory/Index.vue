@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import AppIcon from '@/components/AppIcon.vue';
 import InventoryRecipes from '@/components/admin/InventoryRecipes.vue';
@@ -19,6 +19,7 @@ import {
 import {
     store as storeItem,
     update as updateItem,
+    quickAdd as setQuickAdd,
 } from '@/routes/admin/inventory/items';
 import { adjustments } from '@/routes/admin/inventory';
 import '../../../../css/inventory.css';
@@ -33,8 +34,40 @@ const props = defineProps<{
     optionIngredients: Record<number, Ingredient[]>;
 }>();
 const stocks = computed(() => props.stockItems);
+const page = usePage();
+const canManageQuickAdd = computed(
+    () => page.props.auth.user?.role === 'owner',
+);
 const movements = computed(() => props.stockMovements);
 const processing = ref(false);
+const quickAddSavingId = ref<number | null>(null);
+const quickAddError = ref('');
+const quickAddHelpButton = ref<HTMLButtonElement>();
+const quickAddHelp = ref<HTMLElement>();
+function showQuickAddHelp(): void {
+    if (!quickAddHelpButton.value || !quickAddHelp.value) {
+        return;
+    }
+    const bounds = quickAddHelpButton.value.getBoundingClientRect();
+    const width = Math.min(300, window.innerWidth - 24);
+    quickAddHelp.value.style.width = `${width}px`;
+    quickAddHelp.value.style.left = `${Math.max(12, Math.min(bounds.right - width, window.innerWidth - width - 12))}px`;
+    quickAddHelp.value.style.top = `${bounds.bottom}px`;
+    quickAddHelp.value.showPopover();
+}
+function hideQuickAddHelp(event: MouseEvent | FocusEvent): void {
+    const target = event.relatedTarget;
+    if (
+        (event.type === 'mouseleave' &&
+            document.activeElement === quickAddHelpButton.value) ||
+        (target instanceof Node &&
+            (quickAddHelp.value?.contains(target) ||
+                quickAddHelpButton.value?.contains(target)))
+    ) {
+        return;
+    }
+    quickAddHelp.value?.hidePopover();
+}
 const query = ref('');
 const filter = ref('all');
 const selectedStockId = ref(0);
@@ -174,7 +207,13 @@ function openItem(item?: StockItem): void {
                   threshold: item.threshold,
                   active: item.active,
               }
-            : { id: 0, name: '', unit: 'g', threshold: 0, active: true },
+            : {
+                  id: 0,
+                  name: '',
+                  unit: 'g',
+                  threshold: 0,
+                  active: true,
+              },
     );
     original.value = JSON.stringify(draft);
     error.value = '';
@@ -210,6 +249,41 @@ function saveItem(): void {
     } else {
         router.post(storeItem.url(), data, callbacks);
     }
+}
+function toggleQuickAdd(item: StockItem): void {
+    if (
+        !canManageQuickAdd.value ||
+        item.unit === 'pcs' ||
+        quickAddSavingId.value !== null
+    ) {
+        return;
+    }
+    const enabled = !item.quickAdd;
+    quickAddSavingId.value = item.id;
+    quickAddError.value = '';
+    router.patch(
+        setQuickAdd(item.id),
+        { is_quick_add: enabled },
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                notice.value = `${item.name}: ${enabled ? 'ditampilkan di' : 'dihapus dari'} tambah cepat.`;
+            },
+            onError: (errors) => {
+                quickAddError.value =
+                    Object.values(errors).join(' ') ||
+                    'Preferensi tambah cepat gagal disimpan.';
+            },
+            onNetworkError: () => {
+                quickAddError.value =
+                    'Koneksi gagal. Muat ulang tabel untuk memeriksa preferensi yang tersimpan.';
+                return false;
+            },
+            onFinish: () => {
+                quickAddSavingId.value = null;
+            },
+        },
+    );
 }
 function openAdjustment(item?: StockItem): void {
     Object.assign(adjustment, {
@@ -320,6 +394,9 @@ function openDetail(item: StockItem): void {
                 ><b>3</b>Adjustment & riwayat</span
             >
         </div>
+        <p v-if="quickAddError" class="field-error" role="alert">
+            {{ quickAddError }}
+        </p>
         <div v-if="section === 'stock'" class="inventory-summary">
             <article>
                 <span class="summary-icon"><AppIcon name="category" /></span>
@@ -411,6 +488,7 @@ function openDetail(item: StockItem): void {
                         class="table-scroll"
                         tabindex="0"
                         aria-label="Tabel stok, geser untuk melihat semua kolom"
+                        @scroll="quickAddHelp?.hidePopover()"
                     >
                         <table class="product-table inventory-table">
                             <thead>
@@ -429,6 +507,43 @@ function openDetail(item: StockItem): void {
                                         Reorder point
                                     </th>
                                     <th scope="col">Status</th>
+                                    <th scope="col">
+                                        <span class="stock-quick-add-heading">
+                                            Tambah cepat
+                                            <button
+                                                ref="quickAddHelpButton"
+                                                type="button"
+                                                class="stock-quick-add-help-button"
+                                                aria-label="Tentang tambah cepat"
+                                                aria-describedby="stock-quick-add-help"
+                                                @mouseenter="showQuickAddHelp"
+                                                @mouseleave="hideQuickAddHelp"
+                                                @focus="showQuickAddHelp"
+                                                @blur="hideQuickAddHelp"
+                                                @click="showQuickAddHelp"
+                                            >
+                                                <AppIcon
+                                                    name="info"
+                                                    :size="16"
+                                                />
+                                            </button>
+                                            <span
+                                                id="stock-quick-add-help"
+                                                ref="quickAddHelp"
+                                                popover="auto"
+                                                role="tooltip"
+                                                class="stock-quick-add-help"
+                                                @mouseleave="hideQuickAddHelp"
+                                            >
+                                                Aktifkan agar bahan muncul
+                                                sebagai pintasan saat
+                                                menambahkan bahan ke resep.
+                                                Bahan tetap bisa ditemukan
+                                                melalui pencarian meskipun
+                                                toggle nonaktif.
+                                            </span>
+                                        </span>
+                                    </th>
                                     <th scope="col" class="align-right">
                                         Tindakan
                                     </th>
@@ -492,6 +607,52 @@ function openDetail(item: StockItem): void {
                                                     : 'Cukup'
                                             }}</span
                                         >
+                                    </td>
+                                    <td class="stock-quick-add-cell">
+                                        <span
+                                            v-if="item.unit === 'pcs'"
+                                            class="inventory-meta"
+                                            >—<small>Hanya g / ml</small></span
+                                        >
+                                        <button
+                                            v-else-if="canManageQuickAdd"
+                                            type="button"
+                                            role="switch"
+                                            class="stock-quick-add-toggle"
+                                            :aria-checked="item.quickAdd"
+                                            :aria-label="
+                                                'Tampilkan ' +
+                                                item.name +
+                                                ' di tambah cepat'
+                                            "
+                                            :aria-busy="
+                                                quickAddSavingId === item.id
+                                            "
+                                            :disabled="
+                                                quickAddSavingId !== null
+                                            "
+                                            :title="
+                                                !item.active
+                                                    ? 'Pintasan muncul setelah item diaktifkan.'
+                                                    : 'Tampilkan sebagai pintasan di resep dan tambahan opsi.'
+                                            "
+                                            @click="toggleQuickAdd(item)"
+                                        >
+                                            <span
+                                                class="stock-quick-add-track"
+                                                aria-hidden="true"
+                                                ><span /></span
+                                            ><span>{{
+                                                quickAddSavingId === item.id
+                                                    ? 'Menyimpan…'
+                                                    : item.quickAdd
+                                                      ? 'Aktif'
+                                                      : 'Nonaktif'
+                                            }}</span>
+                                        </button>
+                                        <span v-else class="inventory-meta">{{
+                                            item.quickAdd ? 'Aktif' : 'Nonaktif'
+                                        }}</span>
                                     </td>
                                     <td>
                                         <div class="row-actions">

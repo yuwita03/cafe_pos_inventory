@@ -15,8 +15,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $on_hand_qty
  * @property string $reorder_point
  * @property bool $is_active
+ * @property bool $is_quick_add
  */
-#[Fillable(['name', 'base_unit', 'on_hand_qty', 'reorder_point', 'is_active'])]
+#[Fillable(['name', 'base_unit', 'on_hand_qty', 'reorder_point', 'is_active', 'is_quick_add'])]
 class StockItem extends Model
 {
     /** @use HasFactory<StockItemFactory> */
@@ -25,7 +26,7 @@ class StockItem extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['on_hand_qty' => 'decimal:3', 'reorder_point' => 'decimal:3', 'is_active' => 'boolean'];
+        return ['on_hand_qty' => 'decimal:3', 'reorder_point' => 'decimal:3', 'is_active' => 'boolean', 'is_quick_add' => 'boolean'];
     }
 
     /** @return HasMany<RecipeItem, $this> */

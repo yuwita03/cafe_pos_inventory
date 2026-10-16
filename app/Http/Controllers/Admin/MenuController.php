@@ -9,6 +9,7 @@ use App\Models\Option;
 use App\Models\OptionGroup;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\StockItem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -33,7 +34,7 @@ class MenuController extends Controller
             'status' => $validated['status'] ?? 'all',
             'per_page' => (int) ($validated['per_page'] ?? 10),
         ];
-        $query = Product::with(['variants', 'optionGroups'])->orderBy('name')->orderBy('id');
+        $query = Product::with(['variants.recipeItems', 'variants.stockItem', 'optionGroups'])->orderBy('name')->orderBy('id');
         if ($filters['q'] !== '') {
             $query->whereLike('name', '%'.$filters['q'].'%');
         }
@@ -49,6 +50,12 @@ class MenuController extends Controller
             'image' => $product->image_path ? route('admin.products.image', $product, false).'?v='.rawurlencode($product->image_path) : '',
             'variants' => $product->variants->map(fn (ProductVariant $variant): array => [
                 'id' => $variant->id, 'name' => $variant->name, 'price' => $variant->price_idr, 'available' => $variant->is_available,
+                'stock' => [
+                    'method' => $variant->stock_item_id !== null ? 'finished' : 'ingredients',
+                    'stockId' => $variant->stock_item_id,
+                    'reorderPoint' => (float) ($variant->stockItem->reorder_point ?? 0),
+                    'ingredients' => $variant->recipeItems->map(fn ($row): array => ['stockId' => $row->stock_item_id, 'quantity' => (float) $row->quantity])->all(),
+                ],
             ]),
             'groups' => $product->optionGroups->map(fn (OptionGroup $group): array => [
                 'id' => $group->id, 'required' => (bool) $group->pivot->getAttribute('is_required'),
@@ -57,6 +64,10 @@ class MenuController extends Controller
 
         return Inertia::render('admin/menu/Index', [
             'section' => $request->route('section', 'products'),
+            'stockItems' => StockItem::orderBy('name')->orderBy('id')->get()->map(fn (StockItem $item): array => [
+                'id' => $item->id, 'name' => $item->name, 'unit' => $item->base_unit,
+                'active' => $item->is_active, 'onHand' => (float) $item->on_hand_qty, 'threshold' => (float) $item->reorder_point,
+            ]),
             'filters' => $filters,
             'summary' => [
                 'products' => Product::count(),

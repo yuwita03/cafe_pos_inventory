@@ -9,6 +9,27 @@ test('guests can view login and the public home', function () {
     $this->get(route('home'))->assertOk();
 });
 
+test('active staff can open the cashier frontend prototype', function () {
+    $owner = User::factory()->create(['role' => 'owner']);
+
+    $this->actingAs($owner)->get(route('admin.pos'))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->component('admin/pos/Index'));
+});
+
+test('active staff can open the orders frontend prototype', function () {
+    $owner = User::factory()->create(['role' => 'owner']);
+
+    $this->actingAs($owner)->get(route('admin.orders'))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->component('admin/orders/Index'));
+});
+
+test('active staff can open the kitchen frontend prototype', function () {
+    $owner = User::factory()->create(['role' => 'owner']);
+
+    $this->actingAs($owner)->get(route('admin.kitchen'))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->component('admin/kitchen/Index'));
+});
+
 test('an active owner can log in and receives a new session', function () {
     $owner = User::factory()->create(['role' => 'owner']);
     $this->withSession(['_token' => 'initial-token']);

@@ -43,6 +43,86 @@ test('stock metadata edits cannot alter balances or base units', function (): vo
     $this->assertDatabaseHas('stock_items', ['id' => $item->id, 'name' => 'Renamed', 'base_unit' => 'g', 'on_hand_qty' => '0.000', 'is_active' => false]);
 });
 
+test('owner can create and remove ingredient quick add without changing recipes or stock', function (): void {
+    $data = ['name' => 'Quick add milk', 'base_unit' => 'ml', 'reorder_point' => '10', 'is_active' => true, 'is_quick_add' => true];
+    $this->post(route('admin.inventory.items.store'), $data)->assertSessionHasNoErrors();
+    $item = StockItem::where('name', 'Quick add milk')->firstOrFail();
+    $recipe = RecipeItem::factory()->create(['stock_item_id' => $item->id, 'quantity' => '12.125']);
+
+    $this->get(route('admin.inventory.recipes'))->assertOk()->assertInertia(fn (Assert $page) => $page->where('stockItems.0.quickAdd', true));
+    $this->put(route('admin.inventory.items.update', $item), [...$data, 'is_quick_add' => false])->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('stock_items', ['id' => $item->id, 'is_quick_add' => false, 'on_hand_qty' => '0.000']);
+    $this->assertDatabaseHas('recipe_items', ['id' => $recipe->id, 'stock_item_id' => $item->id, 'quantity' => '12.125']);
+    $this->assertDatabaseCount('stock_movements', 0);
+    $this->get(route('admin.inventory.recipes'))->assertOk()->assertInertia(fn (Assert $page) => $page->where('stockItems.0.quickAdd', false));
+});
+
+test('omitted quick add defaults off for new stock and preserves existing preferences on update', function (): void {
+    $data = ['name' => 'Unpinned beans', 'base_unit' => 'g', 'reorder_point' => '0', 'is_active' => true];
+    $this->post(route('admin.inventory.items.store'), $data)->assertSessionHasNoErrors();
+    $this->assertDatabaseHas('stock_items', ['name' => 'Unpinned beans', 'is_quick_add' => false]);
+    $item = StockItem::factory()->create(['is_quick_add' => true]);
+
+    $this->put(route('admin.inventory.items.update', $item), [...$data, 'name' => $item->name])->assertSessionHasNoErrors();
+
+    expect($item->fresh()->is_quick_add)->toBeTrue();
+});
+
+test('owner can set row quick add independently without overwriting stock metadata recipes or balances', function (): void {
+    $item = StockItem::factory()->create(['name' => 'Row toggle milk', 'base_unit' => 'ml', 'on_hand_qty' => '25.125', 'reorder_point' => '5.000', 'is_active' => false]);
+    $recipe = RecipeItem::factory()->create(['stock_item_id' => $item->id, 'quantity' => '2.125']);
+    $url = route('admin.inventory.items.quickAdd', $item);
+
+    $this->patch($url, ['is_quick_add' => true, 'name' => 'Must not overwrite', 'on_hand_qty' => '999', 'is_active' => true])->assertSessionHasNoErrors();
+    $this->patch($url, ['is_quick_add' => true])->assertSessionHasNoErrors();
+    $this->assertDatabaseHas('stock_items', ['id' => $item->id, 'name' => 'Row toggle milk', 'is_quick_add' => true, 'base_unit' => 'ml', 'on_hand_qty' => '25.125', 'reorder_point' => '5.000', 'is_active' => false]);
+    $this->get(route('admin.inventory.recipes'))->assertInertia(fn (Assert $page) => $page->where('stockItems.0.quickAdd', true));
+    $this->patch($url, ['is_quick_add' => false])->assertSessionHasNoErrors();
+    expect($item->fresh()->is_quick_add)->toBeFalse();
+    $this->assertDatabaseHas('recipe_items', ['id' => $recipe->id, 'quantity' => '2.125']);
+    $this->assertDatabaseCount('stock_movements', 0);
+});
+
+test('row quick add validates booleans and rejects enabling finished stock', function (): void {
+    $item = StockItem::factory()->create(['base_unit' => 'pcs']);
+    $url = route('admin.inventory.items.quickAdd', $item);
+
+    foreach ([[], ['is_quick_add' => 'invalid'], ['is_quick_add' => true]] as $payload) {
+        $this->patchJson($url, $payload)->assertUnprocessable()->assertJsonValidationErrors('is_quick_add');
+    }
+    $this->patch($url, ['is_quick_add' => false])->assertSessionHasNoErrors();
+    expect($item->fresh()->is_quick_add)->toBeFalse();
+});
+
+test('non owners cannot use the row quick add endpoint', function (string $role): void {
+    $item = StockItem::factory()->create(['is_quick_add' => true]);
+    $this->actingAs(User::factory()->create(['role' => $role]));
+
+    $this->patchJson(route('admin.inventory.items.quickAdd', $item), ['is_quick_add' => false])->assertForbidden();
+
+    expect($item->fresh()->is_quick_add)->toBeTrue();
+})->with(['cashier', 'kitchen']);
+
+test('non owners cannot manage quick add preferences', function (string $role): void {
+    $item = StockItem::factory()->create(['is_quick_add' => true]);
+    $this->actingAs(User::factory()->create(['role' => $role]));
+    $data = ['name' => $item->name, 'base_unit' => 'g', 'reorder_point' => '0', 'is_active' => true, 'is_quick_add' => false];
+
+    $this->putJson(route('admin.inventory.items.update', $item), $data)->assertForbidden();
+    $this->postJson(route('admin.inventory.items.store'), [...$data, 'name' => 'Unauthorized favorite', 'is_quick_add' => true])->assertForbidden();
+
+    expect($item->fresh()->is_quick_add)->toBeTrue();
+    $this->assertDatabaseCount('stock_items', 1);
+})->with(['cashier', 'kitchen']);
+
+test('quick add rejects invalid settings and finished stock shortcuts', function (mixed $flag, string $unit): void {
+    $this->postJson(route('admin.inventory.items.store'), ['name' => 'Invalid shortcut', 'base_unit' => $unit, 'reorder_point' => '0', 'is_active' => true, 'is_quick_add' => $flag])
+        ->assertUnprocessable()->assertJsonValidationErrors('is_quick_add');
+
+    $this->assertDatabaseCount('stock_items', 0);
+})->with(['invalid flag' => ['invalid', 'g'], 'finished stock' => [true, 'pcs']]);
+
 test('stock adjustments preserve three decimal places and retries apply exactly once', function (): void {
     $item = StockItem::factory()->create();
     $payload = inventoryAdjustment($item, '0.101');
@@ -130,16 +210,15 @@ test('invalid ingredient assignments preserve the previous recipe', function (st
     $this->assertDatabaseCount('recipe_items', 1);
 })->with(['pcs', 'inactive', 'duplicate', 'zero']);
 
-test('pastry uses one finished pcs item and replaces a previous ingredient recipe', function (): void {
+test('the recipe endpoint rejects manual finished stock assignments and preserves the recipe', function (): void {
     $variant = ProductVariant::factory()->create(['name' => 'Regular']);
     RecipeItem::factory()->create(['product_variant_id' => $variant->id]);
     $pastry = StockItem::factory()->create(['base_unit' => 'pcs']);
 
-    $this->put(route('admin.inventory.recipe', $variant), ['kind' => 'finished', 'stock_item_id' => $pastry->id, 'ingredients' => []])->assertSessionHasNoErrors();
+    $this->put(route('admin.inventory.recipe', $variant), ['kind' => 'finished', 'stock_item_id' => $pastry->id, 'ingredients' => []])->assertSessionHasErrors(['kind', 'stock_item_id']);
 
-    $this->assertDatabaseHas('product_variants', ['id' => $variant->id, 'stock_item_id' => $pastry->id]);
-    $this->assertDatabaseCount('recipe_items', 0);
-    $this->postJson(route('admin.inventory.requirements'), ['variant_id' => $variant->id, 'option_ids' => [], 'quantity' => 3])->assertOk()->assertJsonPath('items.0.total', '3.000');
+    $this->assertDatabaseHas('product_variants', ['id' => $variant->id, 'stock_item_id' => null]);
+    $this->assertDatabaseCount('recipe_items', 1);
 });
 
 test('options persist additive ingredients including zero and an empty option needs no ingredient', function (): void {
@@ -226,18 +305,19 @@ test('adjustments record the actual user and reject replay against another stock
     $this->assertDatabaseCount('stock_movements', 1);
 });
 
-test('pastry links reject non pcs stock and recipe replacement clears a finished stock link', function (): void {
-    $variant = ProductVariant::factory()->create();
+test('the recipe endpoint cannot replace a finished stock method with ingredients', function (): void {
     $beans = StockItem::factory()->create();
     $pastry = StockItem::factory()->create(['base_unit' => 'pcs']);
+    $variant = ProductVariant::factory()->create(['stock_item_id' => $pastry->id]);
     $url = route('admin.inventory.recipe', $variant);
     $this->put($url, ['kind' => 'finished', 'stock_item_id' => $beans->id, 'ingredients' => []])->assertSessionHasErrors('stock_item_id');
-    $this->put($url, ['kind' => 'finished', 'stock_item_id' => $pastry->id, 'ingredients' => []])->assertSessionHasNoErrors();
+    $this->put($url, ['kind' => 'finished', 'stock_item_id' => $pastry->id, 'ingredients' => []])->assertSessionHasErrors(['kind', 'stock_item_id']);
 
-    $this->put($url, ['kind' => 'ingredients', 'stock_item_id' => null, 'ingredients' => [['stock_item_id' => $beans->id, 'quantity' => '18']]])->assertSessionHasNoErrors();
+    $this->put($url, ['kind' => 'ingredients', 'stock_item_id' => null, 'ingredients' => [['stock_item_id' => $beans->id, 'quantity' => '18']]])->assertSessionHasErrors('variants');
 
-    $this->assertDatabaseHas('product_variants', ['id' => $variant->id, 'stock_item_id' => null]);
-    $this->assertDatabaseHas('recipe_items', ['product_variant_id' => $variant->id, 'stock_item_id' => $beans->id]);
+    $this->assertDatabaseHas('product_variants', ['id' => $variant->id, 'stock_item_id' => $pastry->id]);
+    $this->assertDatabaseCount('recipe_items', 0);
+    $this->postJson(route('admin.inventory.requirements'), ['variant_id' => $variant->id, 'option_ids' => [], 'quantity' => 3])->assertOk()->assertJsonPath('items.0.total', '3.000');
 });
 
 test('requirements reject multiple choices for a single group and an unavailable variant', function (): void {

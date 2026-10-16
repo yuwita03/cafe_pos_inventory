@@ -9,6 +9,22 @@ export interface Variant {
     name: string;
     price: number;
     available: boolean;
+    stock?: ProductStockSetup;
+}
+export interface ProductStockSetup {
+    method: 'ingredients' | 'finished';
+    stockId: number | null;
+    openingQuantity?: number | '';
+    reorderPoint: number;
+    ingredients: { stockId: number; quantity: number }[];
+}
+export interface ProductStockItem {
+    id: number;
+    name: string;
+    unit: 'g' | 'ml' | 'pcs';
+    active: boolean;
+    onHand: number;
+    threshold: number;
 }
 export interface Option {
     id?: number;

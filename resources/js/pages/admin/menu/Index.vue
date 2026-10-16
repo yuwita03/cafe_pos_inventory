@@ -29,6 +29,7 @@ import type {
     Category,
     OptionGroup,
     Product,
+    ProductStockItem,
     MenuFilters,
     TablePagination as PaginationData,
 } from '@/types/menu';
@@ -40,6 +41,7 @@ const props = defineProps<{
     filters: MenuFilters;
     pagination: PaginationData;
     summary: { products: number; activeProducts: number };
+    stockItems: ProductStockItem[];
 }>();
 const catalog = computed(() => props.catalog);
 const query = ref(props.section === 'products' ? props.filters.q : '');
@@ -231,6 +233,30 @@ function saveProduct(product: Product, image: File | null): void {
                 name: variant.name.trim(),
                 price_idr: variant.price,
                 is_available: variant.available,
+                stock: variant.stock
+                    ? {
+                          kind: variant.stock.method,
+                          ...(variant.stock.method === 'finished'
+                              ? {
+                                    reorder_point: variant.stock.reorderPoint,
+                                    ...(!variant.id
+                                        ? {
+                                              opening_qty:
+                                                  variant.stock
+                                                      .openingQuantity ?? 0,
+                                          }
+                                        : {}),
+                                }
+                              : {}),
+                          ingredients:
+                              variant.stock.method === 'ingredients'
+                                  ? variant.stock.ingredients.map((row) => ({
+                                        stock_item_id: row.stockId,
+                                        quantity: row.quantity,
+                                    }))
+                                  : [],
+                      }
+                    : undefined,
             })),
             groups: product.groups.map((group) => ({
                 id: group.id,
@@ -400,16 +426,18 @@ function toggleProduct(): void {
                 <h1>{{ title }}<span class="title-dot">.</span></h1>
                 <p>{{ subtitle }}</p>
             </div>
-            <BaseButton variant="primary" @click="addItem"
-                ><AppIcon name="plus" :size="18" />Tambah
-                {{
-                    section === 'products'
-                        ? 'produk'
-                        : section === 'categories'
-                          ? 'kategori'
-                          : 'grup opsi'
-                }}</BaseButton
-            >
+            <div class="catalog-heading-actions">
+                <BaseButton variant="primary" @click="addItem"
+                    ><AppIcon name="plus" :size="18" />Tambah
+                    {{
+                        section === 'products'
+                            ? 'produk'
+                            : section === 'categories'
+                              ? 'kategori'
+                              : 'grup opsi'
+                    }}</BaseButton
+                >
+            </div>
         </div>
         <div class="catalog-summary">
             <div>
@@ -755,6 +783,7 @@ function toggleProduct(): void {
             :groups="catalog.groups"
             :errors="productErrors"
             :processing="processing"
+            :stocks="stockItems"
             @close="editorOpen = false"
             @save="saveProduct"
         />
@@ -965,3 +994,21 @@ function toggleProduct(): void {
         >
     </div>
 </template>
+
+<style scoped>
+.catalog-heading-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+@media (max-width: 767px) {
+    .catalog-heading-actions {
+        width: 100%;
+    }
+    .catalog-heading-actions > .button {
+        flex: 1 1 auto;
+        min-height: 44px;
+    }
+}
+</style>
