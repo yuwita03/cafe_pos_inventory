@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue';
 import AppIcon from '@/components/AppIcon.vue';
+import ProductStockSetup from '@/components/admin/ProductStockSetup.vue';
 import AppDialog from '@/components/ui/AppDialog.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import { formatRupiah as rupiah } from '@/lib/utils';
-import type { Category, OptionGroup, Product } from '@/types/menu';
+import type {
+    Category,
+    OptionGroup,
+    Product,
+    ProductStockItem,
+} from '@/types/menu';
 
 const props = defineProps<{
     product: Product | null;
@@ -12,6 +18,7 @@ const props = defineProps<{
     groups: OptionGroup[];
     errors: Record<string, string>;
     processing: boolean;
+    stocks: ProductStockItem[];
 }>();
 const emit = defineEmits<{
     close: [];
@@ -23,6 +30,14 @@ const draft = reactive<Product>(
               ...props.product,
               variants: props.product.variants.map((variant) => ({
                   ...variant,
+                  stock: variant.stock
+                      ? {
+                            ...variant.stock,
+                            ingredients: variant.stock.ingredients.map(
+                                (row) => ({ ...row }),
+                            ),
+                        }
+                      : undefined,
               })),
               groups: props.product.groups.map((group) => ({ ...group })),
           }
@@ -49,6 +64,8 @@ const originalHasVariants = hasVariants.value;
 const imageError = ref('');
 const selectedImage = ref<File | null>(null);
 const formError = ref('');
+const stockDirty = ref(false);
+const stockEditor = ref<InstanceType<typeof ProductStockSetup>>();
 const imageInput = ref<HTMLInputElement>();
 const lowestPrice = computed(() =>
     Math.min(...draft.variants.map((variant) => Number(variant.price))),
@@ -61,7 +78,8 @@ function close(): void {
         JSON.stringify(draft) !== original ||
         hasVariants.value !== originalHasVariants ||
         optionsEnabled.value !== originalOptionsEnabled ||
-        selectedImage.value !== null
+        selectedImage.value !== null ||
+        stockDirty.value
     ) {
         discardDialogOpen.value = true;
         return;
@@ -168,9 +186,10 @@ function save(): void {
         {
             ...draft,
             name: draft.name.trim(),
-            variants: draft.variants.map((variant) => ({
+            variants: draft.variants.map((variant, index) => ({
                 ...variant,
                 price: Number(variant.price),
+                stock: stockEditor.value?.getSettings()[index],
             })),
             groups: optionsEnabled.value
                 ? draft.groups.map((group) => ({ ...group }))
@@ -185,11 +204,17 @@ function save(): void {
     <AppDialog
         open
         wide
+        class="product-editor-scroll"
         :title="product ? 'Edit produk' : 'Tambah produk'"
         @close="close"
     >
         <form id="product-form" class="product-editor" @submit.prevent="save">
-            <div class="editor-fields">
+            <div
+                class="editor-fields"
+                tabindex="0"
+                role="region"
+                aria-label="Form informasi dan pengaturan produk"
+            >
                 <div
                     v-if="Object.keys(errors).length"
                     class="field-error"
@@ -382,9 +407,17 @@ function save(): void {
                         </div>
                     </template>
                 </section>
+                <ProductStockSetup
+                    ref="stockEditor"
+                    :product-name="draft.name"
+                    :variants="draft.variants"
+                    :stocks="stocks"
+                    :processing="processing"
+                    @change="stockDirty = true"
+                />
                 <section class="form-section">
                     <div class="section-heading options-section-heading">
-                        <h3><span>03</span>Pilihan tambahan</h3>
+                        <h3><span>04</span>Pilihan tambahan</h3>
                         <label class="check-label options-toggle">
                             <input
                                 v-model="optionsEnabled"
@@ -567,7 +600,7 @@ function save(): void {
         </AppDialog>
         <template #footer
             ><span class="save-hint"
-                >Perubahan disimpan setelah validasi server.</span
+                >Produk dan pengaturan stok disimpan bersama.</span
             ><BaseButton @click="close">Batal</BaseButton
             ><BaseButton
                 :disabled="processing"
@@ -581,6 +614,34 @@ function save(): void {
 </template>
 
 <style scoped>
+@media (min-width: 924px) {
+    .product-editor-scroll {
+        height: 90dvh;
+    }
+    .product-editor-scroll :deep(> .dialog-body) {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .product-editor-scroll .product-editor {
+        flex: 1;
+        min-height: 0;
+        grid-template-rows: minmax(0, 1fr);
+        align-items: stretch;
+        overflow: hidden;
+    }
+    .product-editor-scroll .editor-fields {
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+    }
+    .product-editor-scroll .editor-preview {
+        max-height: calc(100% - 48px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+}
 .editor-confirmation {
     padding: 24px 28px;
 }

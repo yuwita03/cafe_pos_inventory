@@ -7,7 +7,7 @@ import {
     savePosPreview,
 } from '../orders/preview.ts';
 
-test('only paid work enters kitchen and actions advance the shared order one step', () => {
+await test('only paid work enters kitchen and actions advance the shared order one step', () => {
     const input = {
         customerName: 'Kitchen preview check',
         source: 'cashier',

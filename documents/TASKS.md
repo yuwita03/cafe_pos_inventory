@@ -48,17 +48,17 @@
 
 ## 03 — Inventory & Recipes
 
-- [ ] Bisa mengelola bahan (g/ml) dan pastry jadi (pcs), melihat saldo serta low-stock warning.
-- [ ] Bisa mengatur resep per variant coffee dan penambahan syrup berdasarkan Sugar Level.
-- [ ] Bisa adjustment dengan alasan; semua perubahan saldo tercatat, tidak negatif, dan bisa dites.
+- [x] Bisa mengelola bahan (g/ml) dan pastry jadi (pcs), melihat saldo serta low-stock warning.
+- [x] Bisa mengatur resep per variant coffee dan penambahan syrup berdasarkan Sugar Level.
+- [x] Bisa adjustment dengan alasan; semua perubahan saldo tercatat, tidak negatif, dan bisa dites.
 
 **Done jika:** kebutuhan stok Americano dapat dihitung dan riwayat perubahan stok konsisten. **Belum perlu penjualan untuk menyelesaikan tahap ini.**
 
 ## 04 — Minimal Authentication
 
-- [ ] Satu akun owner development bisa login dan logout.
-- [ ] Semua route management Menu/Inventory dan yang baru dilindungi `auth`.
-- [ ] Test guest ditolak dari staff routes; customer QR nantinya tetap tidak butuh login.
+- [x] Satu akun owner development bisa login dan logout.
+- [x] Semua route management Menu/Inventory dan yang baru dilindungi `auth`.
+- [x] Test guest ditolak dari staff routes; customer QR nantinya tetap tidak butuh login.
 
 **Done jika:** staf bisa login dan akses management terlindungi. **Belum perlu employee CRUD / full roles.**
 
