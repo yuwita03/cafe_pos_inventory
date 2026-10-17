@@ -31,7 +31,7 @@ Di V1 **fixed roles** (`owner`, `cashier`, `kitchen`), bukan dynamic RBAC. `user
 | BUY   | Purchasing | CRUD supplier; catat pembelian dan item/cost; terima seluruh pembelian untuk menambah stok                                          |
 | POS   | Cashier    | Dine-in (pilih meja) atau takeaway; cash dulu, QRIS lewat payment flow yang sama setelah modul QRIS siap                            |
 | KDS   | Kitchen    | Satu antrean untuk semua channel; queued → preparing → ready → completed                                                            |
-| QR    | Table QR   | QR token unik per meja; menu publik tanpa login; checkout dengan QRIS dinamis; status pesanan privat                                |
+| QR    | Table QR   | QR berisi link dengan ID meja; menu publik tanpa login; checkout dengan QRIS dinamis; status pesanan privat                         |
 | STAFF | Staff      | Login/logout, akun staf, tiga role tetap, server-side authorization                                                                 |
 | DASH  | Dashboard  | Total penjualan terkonfirmasi, jumlah order, produk terlaris, peringatan stok                                                       |
 
@@ -46,7 +46,7 @@ Di V1 **fixed roles** (`owner`, `cashier`, `kitchen`), bukan dynamic RBAC. `user
 
 ### J1 — Table QR (prioritas utama)
 
-1. Guest scan QR meja → sistem mengenali meja dan menampilkan menu aktif.
+1. Guest scan QR meja berisi link seperti `/menu?table=3` → backend memvalidasi ID meja ada dan aktif, lalu menampilkan menu aktif beserta label meja tujuan. ID tidak valid atau meja nonaktif tidak dapat dipakai memesan.
 2. Guest pilih varian (mis. Iced Americano), Sugar Level (Low), pastry, dan jumlah.
 3. Laravel validasi pilihan, hitung harga, cek stok tersedia; buat order `awaiting_payment` dan hold stok sementara.
 4. Sistem minta **dynamic QRIS** dari provider; pembayaran hanya sukses setelah notifikasi provider **terverifikasi di backend**.
@@ -82,6 +82,7 @@ Di V1 **fixed roles** (`owner`, `cashier`, `kitchen`), bukan dynamic RBAC. `user
 ### Pembayaran, order, stok
 
 - QR di meja adalah **link pemesanan**, bukan QRIS pembayaran. QRIS dinamis dibuat pada checkout.
+- V1 menggunakan **ID meja pada URL**, tanpa token acak per meja. Label meja tujuan ditampilkan jelas sebelum pembayaran; backend memvalidasi meja masih aktif saat checkout. Link meja hanya menentukan tujuan pengantaran, bukan bukti keberadaan pelanggan atau akses ke pesanan pelanggan lain.
 - Pembayaran dan kitchen status terpisah. Order hanya `queued` sesudah cash terkonfirmasi atau QRIS verified.
 - Multiple order terpisah dari meja yang sama boleh; scanning QR tidak otomatis membuat order; tanpa akun pelanggan.
 - Stok tersedia = stok fisik `on_hand` dikurangi reservasi aktif. Reservasi order QRIS belum dibayar punya expiry; reservasi order berbayar bertahan sampai dikonsumsi atau dibatalkan.
@@ -96,7 +97,7 @@ Di V1 **fixed roles** (`owner`, `cashier`, `kitchen`), bukan dynamic RBAC. `user
 - Development F00–F03 boleh tanpa auth selama **localhost saja**, tanpa tunnel/port forwarding/data nyata.
 - Minimal staff login ditambahkan **sebelum Purchasing dan POS**. Full fixed-role authorization selesai sebelum publik/deploy.
 - Halaman manajemen menggunakan auth; pembatasan role diterapkan oleh Laravel middleware/policies/gates, bukan sekadar menyembunyikan tombol Vue.
-- Guest order status memakai token terpisah yang sulit ditebak, bukan `order_id` biasa. Jangan percaya screenshot pembayaran/redirect browser.
+- Guest order status tetap memakai **token order privat yang sulit ditebak**, bukan `order_id` biasa atau ID meja. Jangan percaya screenshot pembayaran/redirect browser.
 
 ## 6. Non-functional requirements
 

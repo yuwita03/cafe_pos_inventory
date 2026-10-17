@@ -1,0 +1,19 @@
+future changed
+
+product delete, if the product doesnt have order yet,
+
+in form menu, i want it drop down so make it simpler
+
+reconsider resep, because its in product form too, so itd be 2 tabs handle recipe
+
+semua status, we should handle it because the inactive product will be in the top and i dont want that, my thingking as simple as, first viewe always the active ones, and when we have to see inactive we have to edit search to inactive, default = active
+
+in cashier POS, i want finished product doenst go through kitchen because it doesnt make any sense or just cashier handle it make status simpler
+
+guest receipt, order privacy, and customer history (future consideration, not implemented)
+- Guests and logged-in customers receive a receipt after confirmed payment.
+- Guest checkout records the created order ID in the browser's server-side Laravel session, including orders still awaiting payment.
+- Every guest order status, receipt, and download request checks that the session is allowed to access that order. Knowing or sharing the order URL/ID alone does not grant access.
+- Guest access lasts while that browser session remains valid; clearing cookies, session expiry, or another browser/device loses access. Staff can help retrieve the order through authenticated staff tools.
+- Customer login is separate from staff login. Logged-in customers can see their own order history and receipts across devices, with account ownership checked on the backend.
+- Keep existing staff login and role permissions for staff access. Payment confirmation still comes from verified backend payment processing.

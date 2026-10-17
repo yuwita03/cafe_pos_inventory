@@ -84,12 +84,16 @@ Jangan membuat frontend/backend dua repository terpisah untuk V1.
 
 ### C. Table QR & QRIS
 
-1. `/t/{qr_token}` menampilkan menu guest untuk meja valid.
+**Irisan awal yang tersedia:** hanya UI admin untuk pengelolaan meja oleh owner serta pratinjau/unduh SVG/cetak QR. UI pelanggan dikerjakan pengguna secara terpisah; belum ada katalog atau gambar produk publik. QR dibuat lokal saat diminta owner menggunakan `bacon/bacon-qr-code` 3.1.1; link dibentuk dari `APP_URL` dan ID meja. Tidak ada occupancy, reservasi meja, atau token meja. Gunakan route ID meja sesuai PRD terbaru meskipun contoh route lama masih ada di panduan UI/UX.
+
+1. `/menu?table={id}` disiapkan sebagai tujuan QR dan memvalidasi ID meja aktif. Sementara UI pelanggan belum dibuat, respons hanya teks HTTP 503 yang menyatakan menu belum tersedia; ID invalid/meja nonaktif mendapat teks HTTP 404. Tidak ada UI pelanggan atau data katalog yang disajikan. Pada tahap guest berikutnya, route ini akan menampilkan menu dan label meja sesuai PRD.
 2. Checkout memvalidasi menu, membuat order `awaiting_payment`, mengunci stok dan menyimpan reservasi serta `checkout_key` (idempotent).
 3. Backend meminta QRIS dinamis via provider. Jangan menahan DB transaction terbuka selama network call provider.
 4. Webhook provider → verifikasi signature/reference/amount/currency → lock payment + order → tandai paid/queued **sekali**.
 5. Callback palsu, duplikat, gagal, expired, atau terlambat tidak boleh menciptakan kitchen ticket yang salah. Late-paid setelah expiry masuk `payment_review` untuk owner.
-6. Guest membaca status via **private order token**; QR table token tidak memberikan akses ke order pelanggan lain.
+6. Guest membaca status via **private order token**; ID meja tidak memberikan akses ke order pelanggan lain.
+
+Menu pelanggan serta langkah 2–6 belum diimplementasikan pada irisan awal ini. Membuka tujuan QR tidak membuat transaksi atau mengubah stok. Receipt, akses order guest berbasis session, serta login/history customer merupakan pertimbangan lanjutan di `note`, bukan bagian irisan awal.
 
 **Integration boundary:** buat antarmuka sederhana untuk membuat payment QRIS dan memverifikasi webhook; jangan membangun sistem plugin gateway generik. Fake provider hanya untuk development/test. Pilih provider sesungguhnya sebelum transaksi live.
 

@@ -3,11 +3,7 @@ import { computed, nextTick, ref, useId, watch } from 'vue';
 import AppDialog from '@/components/ui/AppDialog.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import { formatRupiah as rupiah } from '@/lib/utils';
-import {
-    type PosGroup,
-    type CartLine,
-    type PosProduct,
-} from '@/pages/admin/pos/fixtures';
+import { type PosGroup, type CartLine, type PosProduct } from '@/types/pos';
 
 const props = defineProps<{
     open: boolean;

@@ -3,7 +3,7 @@ import { ref, useId } from 'vue';
 import AppIcon from '@/components/AppIcon.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import { formatRupiah as rupiah } from '@/lib/utils';
-import type { CartLine } from '@/pages/admin/pos/fixtures';
+import type { CartLine } from '@/types/pos';
 
 const props = defineProps<{
     lines: CartLine[];

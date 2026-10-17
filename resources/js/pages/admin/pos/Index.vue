@@ -21,7 +21,7 @@ import { orders } from '@/routes/admin';
 import { checkout as cashCheckout } from '@/routes/admin/pos';
 import type { OrderData } from '@/types/orders';
 import type { Category } from '@/types/menu';
-import type { CartLine, PosProduct, PosGroup } from './fixtures';
+import type { CartLine, PosProduct, PosGroup } from '@/types/pos';
 
 defineOptions({ layout: AdminLayout });
 const props = defineProps<{

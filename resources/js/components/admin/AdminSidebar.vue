@@ -6,6 +6,16 @@ import { adminNavigation } from '@/lib/adminNavigation';
 import { logout } from '@/routes';
 const emit = defineEmits<{ navigate: [] }>();
 const page = usePage();
+const navigation = computed(() =>
+    adminNavigation.map((group) => ({
+        ...group,
+        items: group.items.filter(
+            (item) =>
+                !('ownerOnly' in item) ||
+                page.props.auth.user?.role === 'owner',
+        ),
+    })),
+);
 const currentPath = computed(() => page.url.split('?')[0]);
 const navigationId = useId();
 const expanded = ref<string[]>([]);
@@ -46,10 +56,7 @@ function toggleGroup(label: string): void {
             >
         </div>
         <nav class="sidebar-navigation" aria-label="Navigasi admin">
-            <template
-                v-for="(group, index) in adminNavigation"
-                :key="group.label"
-            >
+            <template v-for="(group, index) in navigation" :key="group.label">
                 <p v-if="!group.icon" class="nav-heading">{{ group.label }}</p>
                 <button
                     v-else
