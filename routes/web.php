@@ -6,13 +6,16 @@ use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\OptionGroupController;
 use App\Http\Controllers\Admin\ProductController;
+use App\Http\Controllers\Admin\TableController;
 use App\Http\Controllers\Auth\SessionController;
+use App\Http\Controllers\GuestMenuController;
 use App\Http\Middleware\EnsureUserIsActive;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
 
 if (app()->environment('local', 'testing')) {
+    Route::get('/menu', [GuestMenuController::class, 'index'])->name('guest.menu');
     Route::middleware('guest')->group(function (): void {
         Route::get('/login', [SessionController::class, 'create'])->name('login');
         Route::post('/login', [SessionController::class, 'store'])->name('login.store');
@@ -38,7 +41,13 @@ if (app()->environment('local', 'testing')) {
         Route::get('/admin/kitchen', [CashOrderController::class, 'kitchen'])->name('admin.kitchen');
         Route::post('/admin/kitchen/orders/{order}/advance', [CashOrderController::class, 'advance'])->name('admin.kitchen.advance');
 
-        foreach (['suppliers', 'purchases', 'tables', 'staff'] as $module) {
+        Route::get('/admin/tables', [TableController::class, 'index'])->name('admin.tables');
+        Route::post('/admin/tables', [TableController::class, 'store'])->name('admin.tables.store');
+        Route::put('/admin/tables/{table}', [TableController::class, 'update'])->name('admin.tables.update');
+        Route::get('/admin/tables/{table}/qr.svg', [TableController::class, 'qr'])->name('admin.tables.qr');
+        Route::get('/admin/tables/{table}/print', [TableController::class, 'print'])->name('admin.tables.print');
+
+        foreach (['suppliers', 'purchases', 'staff'] as $module) {
             Route::inertia('/admin/'.$module, 'admin/Workflow', ['module' => $module])->name('admin.'.$module);
         }
 

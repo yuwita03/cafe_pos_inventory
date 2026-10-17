@@ -72,28 +72,33 @@
 
 ## 06 — Cashier POS
 
-- [ ] Kasir (sementara owner dev) bisa memilih produk, varian, opsi, qty dan dine-in/meja atau takeaway.
-- [ ] Pembayaran **cash** membuat paid order dan memegang reservasi stok untuk kitchen.
-- [ ] Harga dihitung di backend; stok habis, harga manipulasi dan duplicate checkout ditolak/dihandle aman.
+- [x] Kasir (sementara owner dev) bisa memilih produk, varian, opsi, qty dan dine-in/meja atau takeaway.
+- [x] Pembayaran **cash** membuat paid order dan memegang reservasi stok untuk kitchen.
+- [x] Harga dihitung di backend; stok habis, harga manipulasi dan duplicate checkout ditolak/dihandle aman.
 
 **Done jika:** transaksi cash menghasilkan satu pesanan paid/queued yang terlihat pada data order. **QRIS cashier ditambahkan di F05.**
 
 ## 07 — Kitchen Display
 
-- [ ] Kitchen melihat pesanan berbayar dari kasir beserta item/opsi/meja.
-- [ ] Status `queued → preparing → ready → completed` bisa diperbarui secara benar.
-- [ ] Saat `preparing`, stok kopi berkurang sesuai resep dan pastry sesuai pcs **sekali**; cancel sebelum preparing melepas reservasi.
+- [x] Kitchen melihat pesanan berbayar dari kasir beserta item/opsi/meja.
+- [x] Status `queued → preparing → ready → completed` bisa diperbarui secara benar.
+- [x] Saat `preparing`, stok kopi berkurang sesuai resep dan pastry sesuai pcs **sekali**; cancel sebelum preparing melepas reservasi.
 
 **Done jika:** satu order cash kasir berhasil diproses hingga completed tanpa double stock deduction.
 
 ## 08 — Table QR + QRIS
 
-- [ ] Setiap meja memiliki QR token unik; guest bisa pilih menu & checkout tanpa login.
+- [ ] Owner bisa tambah/edit/aktif/nonaktifkan meja dan melihat/unduh SVG/cetak QR berisi `/menu?table={id}`, tanpa token meja; ID dan riwayat order tetap dipertahankan.
+- [ ] UI pelanggan untuk menu dan checkout tanpa login dikerjakan pengguna secara terpisah pada tahap berikutnya. Saat ini tujuan QR hanya teks belum tersedia, tanpa katalog atau UI pelanggan; ID invalid/meja nonaktif ditolak.
 - [ ] QRIS dinamis dibuat melalui provider sandbox/fake lokal; hanya notifikasi **server-verified** mengirim order ke kitchen.
 - [ ] Tangani callback duplikat, gagal, expired, late paid (`payment_review`), dan status order privat.
 - [ ] Cashier bisa memilih QRIS memakai mekanisme pembayaran yang sama.
 
 **Done jika:** Table QR → Iced Americano → verified QRIS → satu kitchen order; unpaid tidak tampil. **Live payment belum siap sampai provider asli diuji.**
+
+**Irisan admin Meja & QR:** UI admin dan backend terintegrasi; UI pelanggan sudah dihapus sesuai koreksi scope pengguna. Status irisan: **Awaiting Approval**. QA independen setelah koreksi scope: **PASS** (inspeksi statis); review **9/10 — APPROVE**, tanpa temuan penghambat. Verifikasi eksekusi: TableQr 23 test / 202 assertions, PHPStan, Vue types, lint, Pint, dan build lulus. Belum ada pemeriksaan browser/scan/cetak fisik; checklist UI dan tahap QRIS belum dinyatakan selesai. Receipt, akses guest berbasis session, dan history customer tetap di `note`.
+
+**Penataan migration lokal:** `create_cafe_tables_table` dipisah sebelum migration order, langsung tanpa token meja; migration penghapusan token dihapus. Test rollback disesuaikan untuk urutan foreign key. TableQr + CashOrderFlow: **49 passed / 564 assertions**, Pint dan PHPStan lulus. Atas persetujuan pengguna, database lokal `cafe_pos` direset dan owner dari `.env`, menu awal, item stok awal, serta 8 meja di-seed ulang; order lama kosong dan saldo stok awal 0.
 
 ## 09 — Employees & Fixed Roles
 

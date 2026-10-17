@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\CafeTable;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str;
 
 class CafeTableSeeder extends Seeder
 {
@@ -14,7 +13,7 @@ class CafeTableSeeder extends Seeder
             return;
         }
         foreach (range(1, 8) as $number) {
-            CafeTable::firstOrCreate(['label' => 'A'.str_pad((string) $number, 2, '0', STR_PAD_LEFT)], ['qr_token' => Str::random(64), 'is_active' => true]);
+            CafeTable::firstOrCreate(['label' => 'A'.str_pad((string) $number, 2, '0', STR_PAD_LEFT)], ['is_active' => true]);
         }
     }
 }

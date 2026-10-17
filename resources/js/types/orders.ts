@@ -1,4 +1,4 @@
-import type { CartLine } from '@/pages/admin/pos/fixtures';
+import type { CartLine } from '@/types/pos';
 
 export const orderStates = {
     awaiting_payment: { label: 'Menunggu pembayaran', tone: 'amber' },

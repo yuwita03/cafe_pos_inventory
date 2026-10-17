@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $label
  * @property bool $is_active
  */
-#[Fillable(['label', 'qr_token', 'is_active'])]
+#[Fillable(['label', 'is_active'])]
 class CafeTable extends Model
 {
     /** @use HasFactory<CafeTableFactory> */

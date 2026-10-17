@@ -9,13 +9,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('cafe_tables', function (Blueprint $table): void {
-            $table->id();
-            $table->string('label', 30)->unique();
-            $table->string('qr_token', 64)->unique();
-            $table->boolean('is_active')->default(true);
-            $table->timestamps();
-        });
         Schema::create('orders', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('table_id')->nullable()->constrained('cafe_tables')->restrictOnDelete();
@@ -90,6 +83,5 @@ return new class extends Migration
         Schema::dropIfExists('order_item_options');
         Schema::dropIfExists('order_items');
         Schema::dropIfExists('orders');
-        Schema::dropIfExists('cafe_tables');
     }
 };
