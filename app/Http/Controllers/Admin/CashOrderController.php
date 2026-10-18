@@ -6,6 +6,7 @@ use App\CashOrders;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AdvanceKitchenOrderRequest;
 use App\Http\Requests\Admin\CashCheckoutRequest;
+use App\InventoryStock;
 use App\Models\CafeTable;
 use App\Models\Category;
 use App\Models\Option;
@@ -25,9 +26,10 @@ use Inertia\Response;
 
 class CashOrderController extends Controller
 {
-    public function pos(Request $request): Response
+    public function pos(Request $request, InventoryStock $inventory): Response
     {
         abort_unless(in_array($request->user()?->role, ['owner', 'cashier'], true), 403);
+        $reservedQuantities = $inventory->reservedQuantities();
 
         return Inertia::render('admin/pos/Index', [
             'catalog' => [
@@ -36,10 +38,10 @@ class CashOrderController extends Controller
                     'id' => $group->id, 'name' => $group->name, 'selection' => $group->selection_type,
                     'options' => $group->options->where('is_active', true)->map(fn (Option $option): array => ['id' => $option->id, 'name' => $option->name, 'price' => $option->price_delta_idr])->values(),
                 ]),
-                'products' => Product::with(['variants', 'optionGroups'])->where('is_active', true)->whereHas('category', fn ($query) => $query->where('is_active', true))->orderBy('name')->get()->map(fn (Product $product): array => [
+                'products' => Product::with(['variants.stockItem', 'variants.recipeItems.stockItem', 'optionGroups'])->where('is_active', true)->whereHas('category', fn ($query) => $query->where('is_active', true))->orderBy('name')->get()->map(fn (Product $product): array => [
                     'id' => $product->id, 'name' => $product->name, 'description' => $product->description ?? '', 'categoryId' => $product->category_id, 'active' => true,
                     'image' => $product->image_path ? route('admin.products.image', $product, false).'?v='.rawurlencode($product->image_path) : '',
-                    'variants' => $product->variants->map(fn (ProductVariant $variant): array => ['id' => $variant->id, 'name' => $variant->name, 'price' => $variant->price_idr, 'available' => $variant->is_available]),
+                    'variants' => $product->variants->map(fn (ProductVariant $variant): array => ['id' => $variant->id, 'name' => $variant->name, 'price' => $variant->price_idr, 'available' => $variant->isOrderable($reservedQuantities)]),
                     'groups' => $product->optionGroups->map(fn (OptionGroup $group): array => ['id' => $group->id, 'required' => (bool) $group->pivot->getAttribute('is_required')]),
                 ]),
             ],
@@ -74,7 +76,7 @@ class CashOrderController extends Controller
         ]);
         $scope = Order::query();
         if ($request->user()->role === 'cashier') {
-            $scope->where('created_by_user_id', $request->user()->id);
+            $scope->where(fn ($query) => $query->where('created_by_user_id', $request->user()->id)->orWhere('source', 'table_qr'));
         }
         $selected = isset($data['order']) ? (clone $scope)->findOrFail((int) substr($data['order'], 4)) : null;
         $filters = ['q' => trim($data['q'] ?? ''), 'status' => $data['status'] ?? '', 'payment_status' => $data['payment_status'] ?? '', 'source' => $data['source'] ?? ''];
@@ -102,6 +104,15 @@ class CashOrderController extends Controller
             'selectedOrder' => $selected ? $cash->present(collect([$selected]))[0] : null,
             'pagination' => ['current_page' => $page->currentPage(), 'last_page' => $page->lastPage(), 'per_page' => $page->perPage(), 'total' => $page->total(), 'from' => $page->firstItem(), 'to' => $page->lastItem(), 'prev_page_url' => $page->previousPageUrl(), 'next_page_url' => $page->nextPageUrl()],
         ]);
+    }
+
+    public function confirmCash(Request $request, Order $order, CashOrders $cash): RedirectResponse
+    {
+        abort_unless(in_array($request->user()?->role, ['owner', 'cashier'], true), 403);
+        $data = $request->validate(['cash_received_idr' => ['required', 'integer', 'min:1', 'max:9007199254740991']]);
+        $cash->confirmGuestCash($order->id, (int) $data['cash_received_idr']);
+
+        return back()->with('success', 'Pembayaran tunai dikonfirmasi.');
     }
 
     public function kitchen(Request $request, CashOrders $cash): Response

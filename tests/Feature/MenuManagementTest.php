@@ -5,6 +5,7 @@ use App\Models\Option;
 use App\Models\OptionGroup;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\StockItem;
 use App\Models\User;
 use App\ProductImage;
 use Database\Seeders\MenuSeeder;
@@ -22,10 +23,12 @@ beforeEach(function () {
 /** @return array<string, mixed> */
 function menuProductPayload(Category $category): array
 {
+    $stock = ['kind' => 'ingredients', 'ingredients' => [['stock_item_id' => StockItem::factory()->create(['base_unit' => 'g', 'on_hand_qty' => 0])->id, 'quantity' => 18]]];
+
     return ['name' => 'Americano', 'category_id' => $category->id, 'description' => 'Fresh coffee',
         'is_active' => true, 'variants' => [
-            ['name' => 'Hot', 'price_idr' => 22000, 'is_available' => true],
-            ['name' => 'Iced', 'price_idr' => 25000, 'is_available' => true],
+            ['name' => 'Hot', 'price_idr' => 22000, 'is_available' => true, 'stock' => $stock],
+            ['name' => 'Iced', 'price_idr' => 25000, 'is_available' => true, 'stock' => $stock],
         ], 'groups' => []];
 }
 

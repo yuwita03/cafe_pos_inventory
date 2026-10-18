@@ -158,7 +158,11 @@
     border-color: #cbb6a4;
 }
 .admin-shell .pos-product:disabled {
-    opacity: 1;
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+.pos-product:disabled .pos-product-image {
+    filter: grayscale(1);
 }
 .pos-product-image {
     position: relative;

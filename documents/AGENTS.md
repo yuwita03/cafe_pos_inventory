@@ -35,6 +35,7 @@
 - Do not introduce repositories, services, interfaces, microservices, or new patterns without a concrete need.
 - Reuse existing dependencies and code before proposing new ones.
 - Make small, reviewable changes; preserve unrelated user work.
+- Give each distinct UI page its own file instead of combining multiple pages in one component. Use short, descriptive filenames that reflect the page’s purpose, such as `Cart.vue` or `CustomerDetails.vue`. Extract reusable UI sections into separate components when appropriate.
 - Do not compromise correctness or security merely to simplify code.
 
 ## 4. Feature Workflow

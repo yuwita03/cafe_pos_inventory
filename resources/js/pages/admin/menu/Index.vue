@@ -233,30 +233,35 @@ function saveProduct(product: Product, image: File | null): void {
                 name: variant.name.trim(),
                 price_idr: variant.price,
                 is_available: variant.available,
-                stock: variant.stock
+                ...(variant.stock
                     ? {
-                          kind: variant.stock.method,
-                          ...(variant.stock.method === 'finished'
-                              ? {
-                                    reorder_point: variant.stock.reorderPoint,
-                                    ...(!variant.id
-                                        ? {
-                                              opening_qty:
-                                                  variant.stock
-                                                      .openingQuantity ?? 0,
-                                          }
-                                        : {}),
-                                }
-                              : {}),
-                          ingredients:
-                              variant.stock.method === 'ingredients'
-                                  ? variant.stock.ingredients.map((row) => ({
-                                        stock_item_id: row.stockId,
-                                        quantity: row.quantity,
-                                    }))
-                                  : [],
+                          stock: {
+                              kind: variant.stock.method,
+                              ...(variant.stock.method === 'finished'
+                                  ? {
+                                        reorder_point:
+                                            variant.stock.reorderPoint,
+                                        ...(!variant.id
+                                            ? {
+                                                  opening_qty:
+                                                      variant.stock
+                                                          .openingQuantity ?? 0,
+                                              }
+                                            : {}),
+                                    }
+                                  : {}),
+                              ingredients:
+                                  variant.stock.method === 'ingredients'
+                                      ? variant.stock.ingredients.map(
+                                            (row) => ({
+                                                stock_item_id: row.stockId,
+                                                quantity: row.quantity,
+                                            }),
+                                        )
+                                      : [],
+                          },
                       }
-                    : undefined,
+                    : {}),
             })),
             groups: product.groups.map((group) => ({
                 id: group.id,

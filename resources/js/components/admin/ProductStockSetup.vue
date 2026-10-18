@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
 import AppIcon from '@/components/AppIcon.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import type {
@@ -13,13 +13,37 @@ const props = defineProps<{
     variants: Variant[];
     stocks: ProductStockItem[];
     processing: boolean;
+    errors: Record<string, string>;
 }>();
 const emit = defineEmits<{ change: [] }>();
 type Setup = Omit<ProductStockSetup, 'ingredients'> & {
     ingredients: { id: number; stockId: number; quantity: number }[];
 };
 const setups = reactive(new Map<Variant, Setup>());
+const changedVariants = reactive(new Set<Variant>());
 const selectedVariant = ref(0);
+const errorElement = ref<HTMLElement>();
+const localError = ref<{ index: number; message: string } | null>(null);
+const stockErrors = computed(() => {
+    const prefix = `variants.${selectedVariant.value}.stock`;
+    return Object.entries(props.errors)
+        .filter(([key]) => key === prefix || key.startsWith(`${prefix}.`))
+        .map(([, message]) => message);
+});
+watch(
+    () => props.errors,
+    async (errors) => {
+        const field = Object.keys(errors).find((key) =>
+            /^variants\.\d+\.stock(?:\.|$)/.test(key),
+        );
+        if (field) {
+            selectedVariant.value = Number(field.split('.')[1]);
+            localError.value = null;
+            await nextTick();
+            errorElement.value?.focus();
+        }
+    },
+);
 let nextIngredientId = 0;
 watch(
     () => [...props.variants],
@@ -27,6 +51,7 @@ watch(
         for (const item of setups.keys()) {
             if (!variants.includes(item)) {
                 setups.delete(item);
+                changedVariants.delete(item);
             }
         }
         selectedVariant.value = Math.min(
@@ -86,12 +111,17 @@ function addIngredient(): void {
         stockId: 0,
         quantity: 0,
     });
-    emit('change');
+    markChanged();
 }
 function removeIngredient(id: number): void {
     setup.value.ingredients = setup.value.ingredients.filter(
         (row) => row.id !== id,
     );
+    markChanged();
+}
+function markChanged(): void {
+    changedVariants.add(variant.value);
+    localError.value = null;
     emit('change');
 }
 function synchronizeThreshold(event: Event): void {
@@ -99,17 +129,21 @@ function synchronizeThreshold(event: Event): void {
     if (!setup.value.stockId || input.value === '') {
         return;
     }
-    for (const value of setups.values()) {
+    for (const [item, value] of setups) {
         if (
             value.method === 'finished' &&
             value.stockId === setup.value.stockId
         ) {
             value.reorderPoint = Number(input.value);
+            changedVariants.add(item);
         }
     }
 }
-function getSettings(): ProductStockSetup[] {
+function getSettings(): (ProductStockSetup | undefined)[] {
     return props.variants.map((item) => {
+        if (item.id && !changedVariants.has(item)) {
+            return undefined;
+        }
         const value = setups.get(item)!;
         return {
             method: value.method,
@@ -123,11 +157,63 @@ function getSettings(): ProductStockSetup[] {
         };
     });
 }
-defineExpose({ getSettings });
+async function validate(): Promise<boolean> {
+    localError.value = null;
+    for (const [index, item] of props.variants.entries()) {
+        if (item.id && !changedVariants.has(item)) {
+            continue;
+        }
+        const value = setups.get(item)!;
+        if (value.method !== 'ingredients') {
+            continue;
+        }
+        let message = '';
+        if (!value.ingredients.length) {
+            message = 'Tambahkan minimal satu bahan untuk varian ini.';
+        } else if (
+            value.ingredients.some(
+                (row) =>
+                    !props.stocks.some(
+                        (stock) =>
+                            stock.id === row.stockId &&
+                            stock.active &&
+                            ['g', 'ml'].includes(stock.unit),
+                    ),
+            )
+        ) {
+            message = 'Pilih bahan aktif dengan unit g atau ml.';
+        } else if (
+            value.ingredients.some(
+                (row) =>
+                    !/^\d{1,9}(?:\.\d{1,3})?$/.test(String(row.quantity)) ||
+                    Number(row.quantity) < 0.001,
+            )
+        ) {
+            message =
+                'Isi jumlah per porsi minimal 0,001 dengan maksimal tiga angka desimal.';
+        } else if (
+            new Set(value.ingredients.map((row) => row.stockId)).size !==
+            value.ingredients.length
+        ) {
+            message =
+                'Bahan yang sama tidak boleh dipilih dua kali dalam satu varian.';
+        }
+        if (message) {
+            selectedVariant.value = index;
+            localError.value = { index, message };
+            await nextTick();
+            errorElement.value?.focus();
+            return false;
+        }
+    }
+    return true;
+}
+
+defineExpose({ getSettings, validate });
 </script>
 
 <template>
-    <section class="form-section" @input="emit('change')">
+    <section class="form-section" @input="markChanged">
         <h3><span>03</span>Pengurangan stok</h3>
         <fieldset class="stock-configuration-fields" :disabled="processing">
             <legend class="sr-only">Pengaturan stok setiap varian</legend>
@@ -154,6 +240,34 @@ defineExpose({ getSettings });
             <p class="stock-variant-context">
                 Untuk varian <strong>{{ variant?.name || 'Regular' }}</strong>
             </p>
+            <p
+                v-if="
+                    variant?.id &&
+                    !variant.stock?.stockId &&
+                    !variant.stock?.ingredients.length &&
+                    !changedVariants.has(variant)
+                "
+                class="field-help"
+            >
+                Pengaturan stok belum lengkap. Varian ini tidak dapat dipesan
+                sampai pengaturan stok dilengkapi.
+            </p>
+            <div
+                v-if="
+                    stockErrors.length || localError?.index === selectedVariant
+                "
+                ref="errorElement"
+                class="field-error"
+                role="alert"
+                tabindex="-1"
+            >
+                <p v-if="localError?.index === selectedVariant">
+                    {{ localError.message }}
+                </p>
+                <p v-for="message in stockErrors" :key="message">
+                    {{ message }}
+                </p>
+            </div>
             <div v-if="methodLocked" class="stock-method-summary">
                 <AppIcon
                     :name="setup.method === 'finished' ? 'category' : 'coffee'"
@@ -212,7 +326,7 @@ defineExpose({ getSettings });
                 class="stock-setup-details"
             >
                 <div class="stock-details-heading">
-                    <strong>Resep per porsi</strong><span>g / ml</span>
+                    <strong>Resep per porsi (wajib)</strong><span>g / ml</span>
                 </div>
                 <div
                     v-if="!setup.ingredients.length"
@@ -289,8 +403,9 @@ defineExpose({ getSettings });
                     terlebih dahulu.
                 </p>
                 <p class="field-help stock-detail-note">
-                    Setiap varian memiliki resep tersendiri. Opsi tambahan tetap
-                    diatur melalui Resep & opsi.
+                    Minimal satu bahan per varian. Saldo stok boleh nol saat
+                    mengatur resep. Opsi tambahan tetap diatur melalui Resep &
+                    opsi.
                 </p>
             </div>
 

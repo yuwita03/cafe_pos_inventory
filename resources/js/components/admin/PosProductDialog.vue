@@ -10,6 +10,7 @@ const props = defineProps<{
     product: PosProduct | null;
     line: CartLine | null;
     groups: PosGroup[];
+    customerMode?: boolean;
 }>();
 const emit = defineEmits<{ close: []; save: [line: CartLine] }>();
 const formId = useId();
@@ -128,6 +129,8 @@ async function save(): Promise<void> {
     <AppDialog
         :open="open"
         :title="line ? 'Ubah pesanan' : 'Pilih pesanan'"
+        :eyebrow="customerMode ? 'MENU' : 'CAFÉ POS'"
+        :class="{ 'customer-product-dialog': customerMode }"
         @close="emit('close')"
     >
         <form
@@ -138,8 +141,21 @@ async function save(): Promise<void> {
             novalidate
             @submit.prevent="save"
         >
+            <img
+                v-if="customerMode && product.image"
+                class="customer-detail-image"
+                :src="product.image"
+                :alt="product.name"
+            />
+            <div
+                v-else-if="customerMode"
+                class="customer-detail-placeholder"
+                aria-hidden="true"
+            ></div>
             <div class="pos-config-intro">
-                <span class="pos-kicker">MENU CONTOH</span>
+                <span class="pos-kicker">{{
+                    customerMode ? 'PILIHAN MENU' : 'MENU CONTOH'
+                }}</span>
                 <h3>{{ product.name }}</h3>
                 <p>{{ product.description }}</p>
             </div>
@@ -286,7 +302,11 @@ async function save(): Promise<void> {
         <template #footer
             ><BaseButton @click="emit('close')">Batal</BaseButton
             ><BaseButton type="submit" :form="formId" variant="primary">{{
-                line ? 'Simpan perubahan' : 'Tambah ke pesanan'
+                line
+                    ? 'Simpan perubahan'
+                    : customerMode
+                      ? 'Tambah ke keranjang'
+                      : 'Tambah ke pesanan'
             }}</BaseButton></template
         >
     </AppDialog>

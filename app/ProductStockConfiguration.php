@@ -24,23 +24,23 @@ final class ProductStockConfiguration
                 throw ValidationException::withMessages(['variants' => 'Stok produk terhubung otomatis dan tidak dapat diganti atau dilepas.']);
             }
         }
-        if ($hasRecipe && empty($configuration['ingredients'])) {
-            throw ValidationException::withMessages(['variants' => 'Resep yang sudah diatur harus memiliki sedikitnya satu bahan.']);
+        if ($configuration['kind'] === 'ingredients' && empty($configuration['ingredients'])) {
+            throw ValidationException::withMessages(['variants' => 'Tambahkan minimal satu bahan untuk varian ini.']);
         }
         if (! $isNewVariant && array_key_exists('opening_qty', $configuration)) {
             throw ValidationException::withMessages(['variants' => 'Stok awal hanya dapat diisi untuk varian baru. Gunakan Adjustment untuk mengubah saldo.']);
         }
         if ($configuration['kind'] === 'ingredients') {
-            $rows = collect($configuration['ingredients'] ?? [])->sortBy('stock_item_id')->values();
+            $rows = collect($configuration['ingredients'])->sortBy('stock_item_id')->values();
             $ids = $rows->pluck('stock_item_id')->map(fn ($id): int => (int) $id)->all();
             $items = StockItem::whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
             $normalized = $rows->map(fn (array $row): array => ['stock_item_id' => (int) $row['stock_item_id'], 'quantity' => StockQuantity::decimal(StockQuantity::milli($row['quantity']))])->all();
             $current = $variant->recipeItems()->orderBy('stock_item_id')->get()->map(fn ($row): array => ['stock_item_id' => $row->stock_item_id, 'quantity' => $row->quantity])->all();
-            if ($current === $normalized) {
-                return;
-            }
             if ($items->count() !== count($ids) || $items->contains(fn (StockItem $item): bool => ! $item->is_active || ! in_array($item->base_unit, ['g', 'ml'], true))) {
                 throw ValidationException::withMessages(['variants' => 'Pilih bahan aktif dengan unit g atau ml.']);
+            }
+            if ($current === $normalized) {
+                return;
             }
             $variant->update(['stock_item_id' => null]);
             $variant->recipeItems()->delete();

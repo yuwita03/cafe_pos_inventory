@@ -50,7 +50,7 @@ class SaveProductRequest extends FormRequest
             'variants.*.stock.reorder_point' => ['sometimes', 'numeric', 'min:0', 'regex:/^\d{1,9}(?:\.\d{1,3})?$/D'],
             'variants.*.stock.ingredients' => ['sometimes', 'array', 'max:100'],
             'variants.*.stock.ingredients.*' => ['array:stock_item_id,quantity'],
-            'variants.*.stock.ingredients.*.stock_item_id' => ['required', 'integer', Rule::exists('stock_items', 'id')->whereIn('base_unit', ['g', 'ml'])],
+            'variants.*.stock.ingredients.*.stock_item_id' => ['required', 'integer', Rule::exists('stock_items', 'id')->where('is_active', true)->whereIn('base_unit', ['g', 'ml'])],
             'variants.*.stock.ingredients.*.quantity' => ['required', 'numeric', 'min:0.001', 'regex:/^\d{1,9}(?:\.\d{1,3})?$/D'],
             'groups' => ['present', 'array', 'max:50'],
             'groups.*' => ['array:id,is_required'],
@@ -69,6 +69,10 @@ class SaveProductRequest extends FormRequest
             foreach ($this->array('variants') as $index => $variant) {
                 $stock = $variant['stock'] ?? null;
                 if ($stock === null) {
+                    if (empty($variant['id'])) {
+                        $validator->errors()->add("variants.$index.stock.kind", 'Pilih cara pengurangan stok untuk varian baru.');
+                    }
+
                     continue;
                 }
                 if (! isset($stock['kind'])) {
@@ -77,6 +81,9 @@ class SaveProductRequest extends FormRequest
                     continue;
                 }
                 $ids = array_column($stock['ingredients'] ?? [], 'stock_item_id');
+                if ($stock['kind'] === 'ingredients' && $ids === []) {
+                    $validator->errors()->add("variants.$index.stock.ingredients", 'Tambahkan minimal satu bahan untuk varian ini.');
+                }
                 if (count($ids) !== count(array_unique($ids))) {
                     $validator->errors()->add("variants.$index.stock.ingredients", 'Bahan yang sama tidak boleh dipilih dua kali dalam satu varian.');
                 }

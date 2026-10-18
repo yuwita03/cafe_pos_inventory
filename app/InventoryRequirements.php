@@ -15,7 +15,7 @@ final class InventoryRequirements
     public function calculate(int $variantId, array $optionIds, int $quantity): array
     {
         $variant = ProductVariant::with(['product.category', 'product.optionGroups.options.ingredients.stockItem', 'recipeItems.stockItem', 'stockItem'])->findOrFail($variantId);
-        if (! $variant->is_available || ! $variant->product->is_active || ! $variant->product->category->is_active) {
+        if (! $variant->is_available || ! $variant->product->is_active || ! $variant->product->category->is_active || ! $variant->hasValidStockConfiguration()) {
             throw ValidationException::withMessages(['variant_id' => 'Produk, kategori, atau varian tidak tersedia.']);
         }
         $allowedIds = [];
