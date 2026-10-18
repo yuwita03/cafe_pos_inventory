@@ -34,7 +34,7 @@ class InventoryController extends Controller
 {
     public function index(Request $request): Response
     {
-        $reservations = DB::table('stock_reservations')->where('status', 'active')->groupBy('stock_item_id')->selectRaw('stock_item_id, SUM(quantity) AS quantity')->pluck('quantity', 'stock_item_id');
+        $reservations = DB::table('stock_reservations')->where('status', 'active')->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))->groupBy('stock_item_id')->selectRaw('stock_item_id, SUM(quantity) AS quantity')->pluck('quantity', 'stock_item_id');
         $variants = ProductVariant::with('recipeItems')->get();
         $recipes = [];
         foreach ($variants as $variant) {
@@ -97,7 +97,7 @@ class InventoryController extends Controller
             if ($data['base_unit'] !== $item->base_unit) {
                 throw ValidationException::withMessages(['base_unit' => 'Unit dasar item yang sudah dibuat tidak dapat diubah.']);
             }
-            if (! $data['is_active'] && DB::table('stock_reservations')->where('stock_item_id', $item->id)->where('status', 'active')->exists()) {
+            if (! $data['is_active'] && DB::table('stock_reservations')->where('stock_item_id', $item->id)->where('status', 'active')->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))->exists()) {
                 throw ValidationException::withMessages(['is_active' => 'Item masih direservasi pesanan aktif dan belum dapat dinonaktifkan.']);
             }
             $item->update($data);

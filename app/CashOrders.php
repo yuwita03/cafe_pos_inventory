@@ -20,10 +20,23 @@ final class CashOrders
     /** @param array<string, mixed> $data */
     public function checkout(User $actor, array $data): Order
     {
+        return $this->place($actor, $data);
+    }
+
+    /** @param array<string, mixed> $data */
+    public function guestCheckout(array $data): Order
+    {
+        return $this->place(null, $data);
+    }
+
+    /** @param array<string, mixed> $data */
+    private function place(?User $actor, array $data): Order
+    {
         $data['customer_name'] = trim($data['customer_name']);
+        $data['customer_email'] = isset($data['customer_email']) ? trim($data['customer_email']) : null;
         $data['table_id'] = isset($data['table_id']) ? (int) $data['table_id'] : null;
         $data['expected_total_idr'] = (int) $data['expected_total_idr'];
-        $data['cash_received_idr'] = (int) $data['cash_received_idr'];
+        $data['cash_received_idr'] = $actor ? (int) $data['cash_received_idr'] : null;
         foreach ($data['items'] as &$line) {
             $line['variant_id'] = (int) $line['variant_id'];
             $line['quantity'] = (int) $line['quantity'];
@@ -37,10 +50,12 @@ final class CashOrders
         $fingerprint = hash('sha256', json_encode($data, JSON_THROW_ON_ERROR));
 
         return DB::transaction(function () use ($actor, $data, $fingerprint): Order {
-            User::whereKey($actor->id)->lockForUpdate()->firstOrFail();
+            if ($actor) {
+                User::whereKey($actor->id)->lockForUpdate()->firstOrFail();
+            }
             $previous = Order::where('checkout_key', $data['checkout_key'])->first();
             if ($previous) {
-                if ($previous->created_by_user_id !== $actor->id || $previous->checkout_fingerprint !== $fingerprint) {
+                if ($previous->created_by_user_id !== $actor?->id || $previous->checkout_fingerprint !== $fingerprint) {
                     throw ValidationException::withMessages(['checkout_key' => 'Kunci checkout sudah digunakan untuk pesanan berbeda.']);
                 }
 
@@ -58,6 +73,7 @@ final class CashOrders
             $options = Option::whereIn('id', $optionIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
             $snapshots = [];
             $requirements = [];
+            $stockProducts = [];
             $total = 0;
             foreach ($data['items'] as $line) {
                 $variant = $variants->get($line['variant_id']);
@@ -66,6 +82,7 @@ final class CashOrders
                 }
                 foreach (app(InventoryRequirements::class)->calculate($variant->id, $line['option_ids'], $line['quantity']) as $required) {
                     $id = $required['stockId'];
+                    $stockProducts[$id][$variant->product->name] = true;
                     $requirements[$id] = ($requirements[$id] ?? 0) + StockQuantity::milli($required['total']);
                     if ($requirements[$id] > StockQuantity::MAX_MILLI) {
                         throw ValidationException::withMessages(['items' => 'Kebutuhan stok melebihi batas yang didukung.']);
@@ -82,20 +99,22 @@ final class CashOrders
             if ($total !== $data['expected_total_idr']) {
                 throw ValidationException::withMessages(['expected_total_idr' => 'Harga menu berubah. Muat ulang menu dan periksa ulang pesanan sebelum membayar.']);
             }
-            if ($data['cash_received_idr'] < $total) {
+            if ($actor && $data['cash_received_idr'] < $total) {
                 throw ValidationException::withMessages(['cash_received_idr' => 'Uang tunai tidak mencukupi total pesanan.']);
             }
             $stocks = StockItem::whereIn('id', array_keys($requirements))->orderBy('id')->lockForUpdate()->get();
-            $reserved = DB::table('stock_reservations')->whereIn('stock_item_id', array_keys($requirements))->where('status', 'active')->groupBy('stock_item_id')->selectRaw('stock_item_id, SUM(quantity) AS quantity')->pluck('quantity', 'stock_item_id');
+            $reserved = DB::table('stock_reservations')->whereIn('stock_item_id', array_keys($requirements))->where('status', 'active')->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))->groupBy('stock_item_id')->selectRaw('stock_item_id, SUM(quantity) AS quantity')->pluck('quantity', 'stock_item_id');
             foreach ($stocks as $stock) {
                 if (! $stock->is_active || StockQuantity::milli($stock->on_hand_qty) - StockQuantity::milli($reserved[$stock->id] ?? '0') < $requirements[$stock->id]) {
-                    throw ValidationException::withMessages(['items' => "Stok {$stock->name} tidak mencukupi. Periksa pesanan atau stok tersedia."]);
+                    $productNames = implode(', ', array_keys($stockProducts[$stock->id]));
+                    throw ValidationException::withMessages(['items' => "Stok untuk {$productNames} tidak lagi mencukupi. Silakan periksa keranjang."]);
                 }
             }
             $order = Order::create([
-                'table_id' => $data['table_id'], 'created_by_user_id' => $actor->id,
-                'customer_name' => $data['customer_name'], 'source' => 'cashier', 'fulfillment_type' => $data['fulfillment_type'],
-                'status' => 'queued', 'public_token' => Str::random(64), 'checkout_key' => $data['checkout_key'],
+                'table_id' => $data['table_id'], 'created_by_user_id' => $actor?->id,
+                'customer_name' => $data['customer_name'], 'customer_email' => $data['customer_email'],
+                'source' => $actor ? 'cashier' : 'table_qr', 'fulfillment_type' => $actor ? $data['fulfillment_type'] : 'dine_in',
+                'status' => $actor ? 'queued' : 'awaiting_payment', 'public_token' => Str::random(64), 'checkout_key' => $data['checkout_key'],
                 'checkout_fingerprint' => $fingerprint, 'total_idr' => $total,
             ]);
             foreach ($snapshots as $snapshot) {
@@ -108,12 +127,63 @@ final class CashOrders
                     DB::table('order_item_options')->insert(['order_item_id' => $itemId, 'option_id' => $option->id, 'option_name_snapshot' => $option->name, 'price_delta_idr' => $option->price_delta_idr]);
                 }
             }
+            $expiresAt = $actor ? null : now()->addMinutes(30);
             foreach ($requirements as $stockId => $milli) {
                 if ($milli > 0) {
-                    DB::table('stock_reservations')->insert(['order_id' => $order->id, 'stock_item_id' => $stockId, 'quantity' => StockQuantity::decimal($milli), 'status' => 'active', 'expires_at' => null]);
+                    DB::table('stock_reservations')->insert(['order_id' => $order->id, 'stock_item_id' => $stockId, 'quantity' => StockQuantity::decimal($milli), 'status' => 'active', 'expires_at' => $expiresAt]);
                 }
             }
-            DB::table('payments')->insert(['order_id' => $order->id, 'method' => 'cash', 'amount_idr' => $total, 'status' => 'paid', 'paid_at' => now(), 'created_at' => now(), 'cash_received_idr' => $data['cash_received_idr'], 'change_idr' => $data['cash_received_idr'] - $total]);
+            DB::table('payments')->insert(['order_id' => $order->id, 'method' => 'cash', 'amount_idr' => $total, 'status' => $actor ? 'paid' : 'pending', 'paid_at' => $actor ? now() : null, 'created_at' => now(), 'cash_received_idr' => $data['cash_received_idr'], 'change_idr' => $actor ? $data['cash_received_idr'] - $total : null]);
+
+            return $order;
+        }, 3);
+    }
+
+    public function expire(int $id): void
+    {
+        DB::transaction(function () use ($id): void {
+            $order = Order::whereKey($id)->lockForUpdate()->firstOrFail();
+            if ($order->status !== 'awaiting_payment') {
+                return;
+            }
+            $expiresAt = DB::table('stock_reservations')->where('order_id', $id)->where('status', 'active')->min('expires_at');
+            if (! $expiresAt || Carbon::parse($expiresAt)->isFuture()) {
+                return;
+            }
+            DB::table('payments')->where('order_id', $id)->where('status', 'pending')->update(['status' => 'expired']);
+            DB::table('stock_reservations')->where('order_id', $id)->where('status', 'active')->update(['status' => 'released']);
+            $order->update(['status' => 'cancelled']);
+        }, 3);
+    }
+
+    public function expirePending(): void
+    {
+        DB::table('stock_reservations')->where('status', 'active')->where('expires_at', '<=', now())->distinct()->pluck('order_id')->each(fn ($id) => $this->expire((int) $id));
+    }
+
+    public function confirmGuestCash(int $id, int $received): Order
+    {
+        $this->expire($id);
+
+        return DB::transaction(function () use ($id, $received): Order {
+            $order = Order::whereKey($id)->lockForUpdate()->firstOrFail();
+            if ($order->source !== 'table_qr') {
+                throw ValidationException::withMessages(['order' => 'Pesanan bukan pesanan tunai pelanggan.']);
+            }
+            $payment = DB::table('payments')->where('order_id', $id)->where('method', 'cash')->lockForUpdate()->first();
+            if (in_array($order->status, ['queued', 'preparing', 'ready', 'completed'], true) && $payment?->status === 'paid' && (int) $payment->cash_received_idr === $received) {
+                return $order;
+            }
+            $expiresAt = DB::table('stock_reservations')->where('order_id', $id)->where('status', 'active')->min('expires_at');
+            if ($order->status !== 'awaiting_payment' || $payment?->status !== 'pending' || ! $expiresAt || ! Carbon::parse($expiresAt)->isFuture()) {
+                throw ValidationException::withMessages(['order' => 'Pesanan sudah dibayar atau kedaluwarsa. Muat ulang daftar pesanan.']);
+            }
+            if ($received < $order->total_idr) {
+                throw ValidationException::withMessages(['cash_received_idr' => 'Uang tunai tidak mencukupi total pesanan.']);
+            }
+            DB::table('payments')->where('id', $payment->id)->update(['status' => 'paid', 'cash_received_idr' => $received, 'change_idr' => $received - $order->total_idr, 'paid_at' => now()]);
+            DB::table('stock_reservations')->where('order_id', $id)->where('status', 'active')->update(['expires_at' => null]);
+            $order->update(['status' => 'queued']);
 
             return $order;
         }, 3);
@@ -158,20 +228,22 @@ final class CashOrders
         $items = DB::table('order_items')->whereIn('order_id', $ids)->orderBy('id')->get();
         $options = DB::table('order_item_options')->whereIn('order_item_id', $items->pluck('id'))->orderBy('id')->get()->groupBy('order_item_id');
         $payments = DB::table('payments')->whereIn('order_id', $ids)->orderBy('id')->get()->groupBy('order_id');
+        $expiresAt = DB::table('stock_reservations')->whereIn('order_id', $ids)->where('status', 'active')->whereNotNull('expires_at')->groupBy('order_id')->selectRaw('order_id, MIN(expires_at) AS expires_at')->pluck('expires_at', 'order_id');
         $grouped = $items->groupBy('order_id');
 
-        $result = $orders->map(function (Order $order) use ($tables, $grouped, $options, $payments): array {
+        $result = $orders->map(function (Order $order) use ($tables, $grouped, $options, $payments, $expiresAt): array {
             $attempts = $payments->get($order->id, collect());
             $payment = $attempts->firstWhere('status', 'paid') ?? $attempts->last();
 
             return [
-                'id' => $order->id, 'number' => 'ORD-'.str_pad((string) $order->id, 6, '0', STR_PAD_LEFT),
-                'customerName' => $order->customer_name, 'source' => $order->source, 'fulfillment' => $order->fulfillment_type,
-                'table' => $tables->get($order->table_id), 'status' => $order->status, 'paymentStatus' => $payment->status ?? 'pending',
+                'id' => $order->id, 'number' => 'ORD-'.str_pad((string) $order->id, 6, '0', STR_PAD_LEFT), 'total' => $order->total_idr,
+                'customerName' => $order->customer_name, 'customerEmail' => $order->customer_email, 'source' => $order->source, 'fulfillment' => $order->fulfillment_type,
+                'table' => $tables->get($order->table_id), 'tableId' => $order->table_id, 'status' => $order->status, 'paymentStatus' => $payment->status ?? 'pending',
                 'method' => $payment->method ?? 'cash', 'reference' => $payment?->provider_reference,
                 'received' => $payment?->cash_received_idr === null ? null : (int) $payment->cash_received_idr,
                 'change' => $payment?->change_idr === null ? null : (int) $payment->change_idr,
                 'createdAt' => $order->created_at->toIso8601String(), 'paidAt' => $payment?->paid_at ? Carbon::parse($payment->paid_at)->toIso8601String() : null,
+                'expiresAt' => isset($expiresAt[$order->id]) ? Carbon::parse($expiresAt[$order->id])->toIso8601String() : null,
                 'lines' => $grouped->get($order->id, collect())->map(function (stdClass $item) use ($options): array {
                     $choices = $options->get($item->id, collect());
 

@@ -285,7 +285,7 @@ test('menu edits preserve variant recipe identity and prevent removing a referen
     $payload = ['name' => $product->name, 'category_id' => $product->category_id, 'description' => '', 'is_active' => true, 'groups' => [], 'variants' => [['id' => $variant->id, 'name' => 'Iced', 'price_idr' => 30000, 'is_available' => true]]];
 
     $this->put(route('admin.products.update', $product), $payload)->assertSessionHasNoErrors();
-    $this->put(route('admin.products.update', $product), [...$payload, 'variants' => [['name' => 'New', 'price_idr' => 30000, 'is_available' => true]]])->assertSessionHasErrors('variants');
+    $this->put(route('admin.products.update', $product), [...$payload, 'variants' => [['name' => 'New', 'price_idr' => 30000, 'is_available' => true, 'stock' => ['kind' => 'finished']]]])->assertSessionHasErrors('variants');
 
     $this->assertDatabaseHas('recipe_items', ['product_variant_id' => $variant->id]);
     $this->assertDatabaseHas('product_variants', ['id' => $variant->id, 'name' => 'Iced', 'price_idr' => 30000]);

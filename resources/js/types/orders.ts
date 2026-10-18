@@ -19,10 +19,13 @@ export const paymentStates = {
 export interface OrderData {
     id: number;
     number: string;
+    total: number;
     customerName: string;
+    customerEmail: string | null;
     source: 'cashier' | 'table_qr';
     fulfillment: 'dine_in' | 'takeaway';
     table: string | null;
+    tableId: number | null;
     status: keyof typeof orderStates;
     paymentStatus: keyof typeof paymentStates;
     method: 'cash' | 'qris';
@@ -31,5 +34,6 @@ export interface OrderData {
     change: number | null;
     createdAt: string;
     paidAt: string | null;
+    expiresAt: string | null;
     lines: CartLine[];
 }

@@ -1,10 +1,17 @@
 <?php
 
 use App\Models\CafeTable;
+use App\Models\Category;
+use App\Models\Option;
+use App\Models\OptionGroup;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Models\RecipeItem;
+use App\Models\StockItem;
 use App\Models\User;
 use Database\Seeders\CafeTableSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -78,13 +85,21 @@ test('owners can preview download and print qr while inactive tables reject expo
     $this->get(route('admin.tables.print', $table))->assertNotFound();
 });
 
-test('the reserved customer link serves no customer ui or catalog and writes no transactions', function (): void {
+test('a valid customer table link renders the active catalog and writes no transactions', function (): void {
     $table = CafeTable::factory()->create();
-    $product = Product::factory()->create();
-    $this->get(route('guest.menu', ['table' => $table->id]))->assertStatus(503)
-        ->assertHeader('Content-Type', 'text/plain; charset=UTF-8')
-        ->assertSeeText('Menu pelanggan belum tersedia.')
-        ->assertDontSee($product->name)->assertDontSee('data-page');
+    $category = Category::factory()->create(['name' => 'Kopi']);
+    $product = Product::factory()->for($category)->create(['name' => 'Americano']);
+    $variant = ProductVariant::factory()->for($product)->create(['name' => 'Iced', 'price_idr' => 24000]);
+    $group = OptionGroup::factory()->create(['name' => 'Sugar Level']);
+    $option = Option::factory()->create(['option_group_id' => $group->id, 'name' => 'Low']);
+    $product->optionGroups()->attach($group, ['is_required' => true]);
+    $hidden = Product::factory()->create(['is_active' => false]);
+
+    $this->get(route('guest.menu', ['table' => $table->id]))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('guest/Menu')->where('table.label', $table->label)->has('catalog.categories', 1)
+        ->where('catalog.products.0.id', $product->id)->where('catalog.products.0.variants.0.id', $variant->id)
+        ->where('catalog.products.0.groups.0.required', true)->where('catalog.groups.0.options.0.id', $option->id)
+        ->missing('catalog.products.1.id')->where('catalog.products', fn ($products) => ! collect($products)->pluck('id')->contains($hidden->id)));
     foreach (['orders', 'payments', 'stock_reservations', 'stock_movements'] as $databaseTable) {
         $this->assertDatabaseCount($databaseTable, 0);
     }
@@ -101,21 +116,21 @@ test('invalid table links stay unavailable without serving customer ui or table 
 test('deactivating and reactivating a table preserves the future customer link', function (): void {
     $table = CafeTable::factory()->create();
     $url = route('guest.menu', ['table' => $table->id]);
-    $this->get($url)->assertStatus(503);
+    $this->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page->component('guest/Menu'));
     $table->update(['is_active' => false]);
     $this->get($url)->assertNotFound();
     $table->update(['is_active' => true]);
-    $this->get($url)->assertStatus(503);
+    $this->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page->component('guest/Menu'));
     $this->assertDatabaseCount('orders', 0);
 });
 
-test('customer product photos are not exposed while the customer interface is deferred', function (): void {
+test('customer product photos are served only for active products', function (): void {
     Storage::fake('public');
     $path = 'products/menu.png';
     Storage::disk('public')->put($path, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1S8AAAAASUVORK5CYII='));
     $product = Product::factory()->create(['image_path' => $path]);
-    $url = '/menu/products/'.$product->id.'/image';
-    $this->get($url)->assertNotFound();
+    $url = route('guest.menu.product-image', $product);
+    $this->get($url)->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
     $product->update(['is_active' => false]);
     $this->get($url)->assertNotFound();
     $this->get(route('admin.products.image', $product))->assertRedirectToRoute('login');
@@ -146,4 +161,81 @@ test('development table seeding is repeatable without table tokens or changing e
     $this->seed(CafeTableSeeder::class);
     $this->assertDatabaseCount('cafe_tables', 8);
     expect($table->fresh()->is_active)->toBeFalse();
+});
+
+test('customer and cashier catalogs require configured stock for at least one serving', function (string $mode, bool $active, bool $enabled, string $unit, bool $available, string $balance = '0.000'): void {
+    $table = CafeTable::factory()->create();
+    $variant = ProductVariant::factory()->create(['is_available' => $enabled]);
+    if ($mode !== 'missing') {
+        $stock = StockItem::factory()->create(['base_unit' => $unit, 'is_active' => $active, 'on_hand_qty' => $balance]);
+        if ($mode === 'finished') {
+            $variant->update(['stock_item_id' => $stock->id]);
+        } else {
+            RecipeItem::factory()->create(['product_variant_id' => $variant->id, 'stock_item_id' => $stock->id, 'quantity' => 18]);
+        }
+    }
+    $this->get(route('guest.menu', ['table' => $table->id]))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->has('catalog.products', 1)->where('catalog.products.0.variants.0.available', $available));
+    $this->actingAs(User::factory()->create(['role' => 'owner']))->get(route('admin.pos'))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->has('catalog.products', 1)->where('catalog.products.0.variants.0.available', $available));
+    $this->assertDatabaseCount('orders', 0);
+    $this->assertDatabaseCount('stock_movements', 0);
+})->with([
+    'unconfigured' => ['missing', true, true, 'g', false],
+    'recipe with zero inventory' => ['ingredients', true, true, 'g', false],
+    'finished with zero inventory' => ['finished', true, true, 'pcs', false],
+    'recipe with insufficient inventory' => ['ingredients', true, true, 'g', false, '17.999'],
+    'recipe with exact inventory' => ['ingredients', true, true, 'g', true, '18.000'],
+    'finished with less than one unit' => ['finished', true, true, 'pcs', false, '0.999'],
+    'finished with one unit' => ['finished', true, true, 'pcs', true, '1.000'],
+    'inactive ingredient' => ['ingredients', false, true, 'ml', false, '18.000'],
+    'inactive finished stock' => ['finished', false, true, 'pcs', false, '1.000'],
+    'disabled variant' => ['ingredients', true, false, 'g', false, '18.000'],
+    'invalid recipe unit' => ['ingredients', true, true, 'pcs', false],
+    'invalid finished unit' => ['finished', true, true, 'g', false],
+]);
+
+test('both menus subtract live holds and ignore expired released and consumed holds', function (string $mode, string $status, ?int $expiryMinutes, bool $available): void {
+    $this->freezeTime();
+    $table = CafeTable::factory()->create();
+    $stock = StockItem::factory()->create(['base_unit' => $mode === 'finished' ? 'pcs' : 'g', 'on_hand_qty' => $mode === 'finished' ? '1.000' : '18.125']);
+    $variant = ProductVariant::factory()->create(['stock_item_id' => $mode === 'finished' ? $stock->id : null]);
+    if ($mode === 'ingredients') {
+        RecipeItem::factory()->create(['product_variant_id' => $variant->id, 'stock_item_id' => $stock->id, 'quantity' => '18.125']);
+    }
+    DB::table('stock_reservations')->insert(['order_id' => Order::factory()->create()->id, 'stock_item_id' => $stock->id,
+        'quantity' => '0.001', 'status' => $status, 'expires_at' => $expiryMinutes === null ? null : now()->addMinutes($expiryMinutes)]);
+    $this->get(route('guest.menu', ['table' => $table->id]))->assertInertia(fn (Assert $page) => $page
+        ->where('catalog.products.0.variants.0.available', $available));
+    $this->actingAs(User::factory()->create(['role' => 'cashier']))->get(route('admin.pos'))->assertInertia(fn (Assert $page) => $page
+        ->where('catalog.products.0.variants.0.available', $available));
+    $this->assertDatabaseCount('stock_movements', 0);
+})->with(['ingredients', 'finished'])->with([
+    'paid hold' => ['active', null, false],
+    'unpaid hold' => ['active', 30, false],
+    'expiry boundary' => ['active', 0, true],
+    'expired hold' => ['active', -1, true],
+    'released hold' => ['released', null, true],
+    'consumed hold' => ['consumed', null, true],
+]);
+
+test('one exhausted ingredient disables only affected variants and replenishment makes them available', function (): void {
+    $table = CafeTable::factory()->create();
+    $beans = StockItem::factory()->create(['base_unit' => 'g', 'on_hand_qty' => 18]);
+    $milk = StockItem::factory()->create(['base_unit' => 'ml', 'on_hand_qty' => 0]);
+    $variant = ProductVariant::factory()->create(['name' => 'Black']);
+    $withMilk = ProductVariant::factory()->create(['product_id' => $variant->product_id, 'name' => 'Milk']);
+    foreach ([$variant, $withMilk] as $item) {
+        RecipeItem::factory()->create(['product_variant_id' => $item->id, 'stock_item_id' => $beans->id, 'quantity' => 18]);
+    }
+    RecipeItem::factory()->create(['product_variant_id' => $withMilk->id, 'stock_item_id' => $milk->id, 'quantity' => 100]);
+    $this->get(route('guest.menu', ['table' => $table->id]))->assertInertia(fn (Assert $page) => $page
+        ->where('catalog.products.0.variants.0.available', true)->where('catalog.products.0.variants.1.available', false));
+    $this->actingAs(User::factory()->create(['role' => 'cashier']))->get(route('admin.pos'))->assertInertia(fn (Assert $page) => $page
+        ->where('catalog.products.0.variants.0.available', true)->where('catalog.products.0.variants.1.available', false));
+    $milk->update(['on_hand_qty' => 100]);
+    $this->get(route('guest.menu', ['table' => $table->id]))->assertInertia(fn (Assert $page) => $page
+        ->where('catalog.products.0.variants.1.available', true));
+    $this->get(route('admin.pos'))->assertInertia(fn (Assert $page) => $page
+        ->where('catalog.products.0.variants.1.available', true));
 });

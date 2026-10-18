@@ -9,6 +9,15 @@ use Illuminate\Validation\ValidationException;
 
 final class InventoryStock
 {
+    /** @return array<int, int> */
+    public function reservedQuantities(): array
+    {
+        return DB::table('stock_reservations')->where('status', 'active')
+            ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->groupBy('stock_item_id')->selectRaw('stock_item_id, SUM(quantity) AS quantity')
+            ->pluck('quantity', 'stock_item_id')->map(fn ($quantity): int => StockQuantity::milli((string) $quantity))->all();
+    }
+
     public function adjust(int $stockItemId, string $delta, string $reason, string $sourceKey, ?int $actorId): StockMovement
     {
         return DB::transaction(function () use ($stockItemId, $delta, $reason, $sourceKey, $actorId): StockMovement {
@@ -29,7 +38,7 @@ final class InventoryStock
             if ($balance < 0 || $balance > StockQuantity::MAX_MILLI) {
                 throw ValidationException::withMessages(['quantity_delta' => 'Hasil stok harus antara 0 dan 999999999.999.']);
             }
-            $reserved = DB::table('stock_reservations')->where('stock_item_id', $item->id)->where('status', 'active')->sum('quantity');
+            $reserved = DB::table('stock_reservations')->where('stock_item_id', $item->id)->where('status', 'active')->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))->sum('quantity');
             if ($balance < StockQuantity::milli((string) $reserved)) {
                 throw ValidationException::withMessages(['quantity_delta' => 'Saldo tidak boleh lebih kecil dari stok yang direservasi pesanan.']);
             }

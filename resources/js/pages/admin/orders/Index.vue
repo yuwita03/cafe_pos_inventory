@@ -8,6 +8,7 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { formatRupiah as rupiah } from '@/lib/utils';
 import { orders as ordersRoute, pos } from '@/routes/admin';
+import { confirmCash } from '@/routes/admin/orders';
 import type { TablePagination } from '@/types/menu';
 import { orderStates, paymentStates, type OrderData } from '@/types/orders';
 
@@ -32,6 +33,9 @@ const selectedNumber = ref<string | null>(props.selectedOrder?.number ?? null);
 const requestError = ref('');
 const loading = ref(false);
 const refreshing = ref(false);
+const cashReceived = ref<number | string>('');
+const confirmingCash = ref(false);
+const cashError = ref('');
 const selected = computed(() => {
     if (selectedNumber.value === props.selectedOrder?.number) {
         return props.selectedOrder;
@@ -151,6 +155,43 @@ function resetFilters(): void {
     orderFilter.value = '';
     paymentFilter.value = '';
     sourceFilter.value = '';
+}
+function confirmSelectedCash(): void {
+    const order = selected.value;
+    if (
+        !order ||
+        confirmingCash.value ||
+        !Number.isSafeInteger(Number(cashReceived.value)) ||
+        Number(cashReceived.value) < order.total
+    ) {
+        cashError.value = 'Masukkan uang tunai minimal sebesar total pesanan.';
+        return;
+    }
+    confirmingCash.value = true;
+    cashError.value = '';
+    router.post(
+        confirmCash.url(order.id),
+        { cash_received_idr: Number(cashReceived.value) },
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                cashReceived.value = '';
+            },
+            onError: (errors) => {
+                cashError.value =
+                    Object.values(errors).join(' ') ||
+                    'Pembayaran belum dapat dikonfirmasi.';
+            },
+            onNetworkError: () => {
+                cashError.value =
+                    'Hasil pembayaran belum dapat dipastikan. Muat ulang pesanan sebelum mencoba lagi.';
+                return false;
+            },
+            onFinish: () => {
+                confirmingCash.value = false;
+            },
+        },
+    );
 }
 </script>
 
@@ -420,6 +461,10 @@ function resetFilters(): void {
                             <dt>Pelanggan</dt>
                             <dd>{{ selected.customerName }}</dd>
                         </div>
+                        <div v-if="selected.customerEmail">
+                            <dt>Email</dt>
+                            <dd>{{ selected.customerEmail }}</dd>
+                        </div>
                         <div>
                             <dt>Sumber</dt>
                             <dd>{{ source(selected) }}</dd>
@@ -527,11 +572,48 @@ function resetFilters(): void {
                     </div>
                 </section>
             </div>
-            <template #footer
-                ><BaseButton @click="selectedNumber = null"
+            <template #footer>
+                <form
+                    v-if="
+                        selected?.source === 'table_qr' &&
+                        selected.status === 'awaiting_payment' &&
+                        selected.paymentStatus === 'pending' &&
+                        selected.method === 'cash'
+                    "
+                    @submit.prevent="confirmSelectedCash"
+                >
+                    <label class="field"
+                        >Uang tunai diterima
+                        <input
+                            v-model.number="cashReceived"
+                            type="number"
+                            min="1"
+                            step="1"
+                            required
+                            :disabled="confirmingCash"
+                        />
+                    </label>
+                    <p v-if="selected.expiresAt" class="orders-detail-help">
+                        Batas bayar: {{ date(selected.expiresAt) }}
+                    </p>
+                    <p v-if="cashError" class="pos-error" role="alert">
+                        {{ cashError }}
+                    </p>
+                    <BaseButton
+                        type="submit"
+                        variant="primary"
+                        :disabled="confirmingCash"
+                        >{{
+                            confirmingCash
+                                ? 'Memproses…'
+                                : 'Konfirmasi pembayaran tunai'
+                        }}</BaseButton
+                    >
+                </form>
+                <BaseButton @click="selectedNumber = null"
                     >Tutup detail</BaseButton
-                ></template
-            >
+                >
+            </template>
         </AppDialog>
     </div>
 </template>

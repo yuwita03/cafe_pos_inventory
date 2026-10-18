@@ -155,7 +155,7 @@ function removeVariant(index: number): void {
     }
     draft.variants.splice(index, 1);
 }
-function save(): void {
+async function save(): Promise<void> {
     if (props.processing) {
         return;
     }
@@ -179,6 +179,9 @@ function save(): void {
         ).size !== draft.variants.length
     ) {
         formError.value = 'Nama tiap varian harus berbeda.';
+        return;
+    }
+    if (!(await stockEditor.value?.validate())) {
         return;
     }
     emit(
@@ -413,6 +416,7 @@ function save(): void {
                     :variants="draft.variants"
                     :stocks="stocks"
                     :processing="processing"
+                    :errors="errors"
                     @change="stockDirty = true"
                 />
                 <section class="form-section">

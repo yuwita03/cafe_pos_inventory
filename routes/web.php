@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\TableController;
 use App\Http\Controllers\Auth\SessionController;
 use App\Http\Controllers\GuestMenuController;
+use App\Http\Controllers\GuestOrderController;
 use App\Http\Middleware\EnsureUserIsActive;
 use Illuminate\Support\Facades\Route;
 
@@ -16,6 +17,11 @@ Route::inertia('/', 'Welcome')->name('home');
 
 if (app()->environment('local', 'testing')) {
     Route::get('/menu', [GuestMenuController::class, 'index'])->name('guest.menu');
+    Route::get('/menu/cart', [GuestMenuController::class, 'index'])->defaults('screen', 'cart')->name('guest.menu.cart');
+    Route::get('/menu/products/{product}', [GuestMenuController::class, 'index'])->whereNumber('product')->defaults('screen', 'product')->name('guest.menu.product');
+    Route::get('/menu/products/{product}/image', [GuestMenuController::class, 'productImage'])->name('guest.menu.product-image');
+    Route::post('/menu/orders', [GuestOrderController::class, 'store'])->middleware('throttle:10,1')->name('guest.orders.store');
+    Route::get('/menu/orders/{order:public_token}', [GuestOrderController::class, 'show'])->name('guest.orders.show');
     Route::middleware('guest')->group(function (): void {
         Route::get('/login', [SessionController::class, 'create'])->name('login');
         Route::post('/login', [SessionController::class, 'store'])->name('login.store');
@@ -38,6 +44,7 @@ if (app()->environment('local', 'testing')) {
         Route::get('/admin/pos', [CashOrderController::class, 'pos'])->name('admin.pos');
         Route::post('/admin/pos/checkout', [CashOrderController::class, 'checkout'])->name('admin.pos.checkout');
         Route::get('/admin/orders', [CashOrderController::class, 'orders'])->name('admin.orders');
+        Route::post('/admin/orders/{order}/confirm-cash', [CashOrderController::class, 'confirmCash'])->name('admin.orders.confirm-cash');
         Route::get('/admin/kitchen', [CashOrderController::class, 'kitchen'])->name('admin.kitchen');
         Route::post('/admin/kitchen/orders/{order}/advance', [CashOrderController::class, 'advance'])->name('admin.kitchen.advance');
 

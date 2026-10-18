@@ -6,7 +6,9 @@ use App\Models\ProductVariant;
 use App\Models\RecipeItem;
 use App\Models\StockItem;
 use App\Models\User;
+use App\ProductStockConfiguration;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function (): void {
@@ -58,18 +60,18 @@ test('zero opening stock produces no movement and stock name collisions preserve
     $this->assertDatabaseCount('stock_movements', 0);
 });
 
-test('product recipes share ingredients across variants without changing ingredient stock', function (): void {
-    $beans = StockItem::factory()->create(['base_unit' => 'g', 'on_hand_qty' => 1000]);
+test('product recipes share ingredients across variants without changing ingredient stock', function (string $balance): void {
+    $beans = StockItem::factory()->create(['base_unit' => 'g', 'on_hand_qty' => $balance]);
     $payload = finishedProductPayload();
     $payload['name'] = 'Americano';
     $payload['variants'] = collect(['Hot', 'Iced'])->map(fn ($name) => ['name' => $name, 'price_idr' => 20000, 'is_available' => true,
         'stock' => ['kind' => 'ingredients', 'ingredients' => [['stock_item_id' => $beans->id, 'quantity' => '18.125']]],
     ])->all();
     $this->post(route('admin.products.store'), $payload)->assertSessionHasNoErrors();
-    expect(RecipeItem::count())->toBe(2)->and($beans->fresh()->on_hand_qty)->toBe('1000.000');
+    expect(RecipeItem::count())->toBe(2)->and($beans->fresh()->on_hand_qty)->toBe($balance);
     expect(ProductVariant::whereNotNull('stock_item_id')->count())->toBe(0);
     $this->assertDatabaseCount('stock_movements', 0);
-});
+})->with(['0.000', '1000.000']);
 
 test('editing a finished product preserves its balance connection and opening movement across repeated saves', function (): void {
     $payload = finishedProductPayload();
@@ -154,7 +156,7 @@ test('a failure in a later variant rolls back the product new stock opening move
     $payload = finishedProductPayload();
     $payload['variants'][] = ['name' => 'Other', 'price_idr' => 20000, 'is_available' => true,
         'stock' => ['kind' => 'ingredients', 'ingredients' => [['stock_item_id' => $inactive->id, 'quantity' => 18]]]];
-    $this->post(route('admin.products.store'), $payload)->assertSessionHasErrors('variants');
+    $this->post(route('admin.products.store'), $payload)->assertSessionHasErrors('variants.1.stock.ingredients.0.stock_item_id');
     $this->assertDatabaseCount('products', 0);
     $this->assertDatabaseCount('product_variants', 0);
     $this->assertDatabaseCount('stock_items', 1);
@@ -213,7 +215,7 @@ test('configured methods are fixed and recipes cannot be emptied but quantities 
     $url = route('admin.products.update', $recipeVariant->product_id);
     $this->put($url, $payload)->assertSessionHasErrors('variants');
     $payload['variants'][0]['stock'] = ['kind' => 'ingredients', 'ingredients' => []];
-    $this->put($url, $payload)->assertSessionHasErrors('variants');
+    $this->put($url, $payload)->assertSessionHasErrors('variants.0.stock.ingredients');
     expect($recipeVariant->fresh()->stock_item_id)->toBeNull()->and($recipeVariant->recipeItems()->first()->quantity)->toBe('18.125');
     $payload['variants'][0]['stock']['ingredients'] = [['stock_item_id' => $beans->id, 'quantity' => '25.000']];
     $this->put($url, $payload)->assertSessionHasNoErrors();
@@ -260,4 +262,73 @@ test('shared finished stock rejects conflicting thresholds atomically and accept
     $this->put(route('admin.products.update', $product), $payload)->assertSessionHasNoErrors();
     expect($stock->fresh()->reorder_point)->toBe('10.000')->and($stock->fresh()->on_hand_qty)->toBe('20.000');
     $this->assertDatabaseCount('stock_movements', 0);
+});
+
+test('new variants require stock setup including variants added to an existing product', function (bool $editing): void {
+    $payload = finishedProductPayload(0);
+    unset($payload['variants'][0]['stock']);
+    if ($editing) {
+        $variant = ProductVariant::factory()->create();
+        $payload['variants'][] = ['id' => $variant->id, 'name' => 'Existing', 'price_idr' => 20000, 'is_available' => true];
+        $this->put(route('admin.products.update', $variant->product_id), $payload)->assertSessionHasErrors('variants.0.stock.kind');
+        expect($variant->product->fresh()->name)->not->toBe('Donat');
+        $this->assertDatabaseCount('product_variants', 1);
+    } else {
+        $this->post(route('admin.products.store'), $payload)->assertSessionHasErrors('variants.0.stock.kind');
+        $this->assertDatabaseCount('products', 0);
+    }
+    $this->assertDatabaseCount('stock_items', 0);
+})->with([false, true]);
+
+test('ingredient mode requires a nonempty recipe when creating and editing', function (bool $editing, bool $omit): void {
+    $payload = finishedProductPayload(0);
+    $payload['variants'][0]['stock'] = ['kind' => 'ingredients'];
+    if (! $omit) {
+        $payload['variants'][0]['stock']['ingredients'] = [];
+    }
+    if ($editing) {
+        $variant = ProductVariant::factory()->create();
+        $originalName = $variant->product->name;
+        $payload['variants'][0]['id'] = $variant->id;
+        $this->put(route('admin.products.update', $variant->product_id), $payload)->assertSessionHasErrors('variants.0.stock.ingredients');
+        expect($variant->product->fresh()->name)->toBe($originalName);
+    } else {
+        $this->post(route('admin.products.store'), $payload)->assertSessionHasErrors('variants.0.stock.ingredients');
+        $this->assertDatabaseCount('products', 0);
+    }
+    $this->assertDatabaseCount('recipe_items', 0);
+    $this->assertDatabaseCount('stock_movements', 0);
+})->with([false, true])->with([false, true]);
+
+test('one incomplete recipe prevents saving all variants and preserves existing recipes', function (): void {
+    $stock = StockItem::factory()->create(['base_unit' => 'g', 'on_hand_qty' => 0]);
+    $variant = ProductVariant::factory()->create(['name' => 'Hot']);
+    RecipeItem::factory()->create(['product_variant_id' => $variant->id, 'stock_item_id' => $stock->id, 'quantity' => 18]);
+    $originalName = $variant->product->name;
+    $payload = finishedProductPayload(0);
+    $payload['variants'] = [
+        ['id' => $variant->id, 'name' => 'Hot', 'price_idr' => 20000, 'is_available' => true, 'stock' => ['kind' => 'ingredients', 'ingredients' => [['stock_item_id' => $stock->id, 'quantity' => 25]]]],
+        ['name' => 'Iced', 'price_idr' => 25000, 'is_available' => true, 'stock' => ['kind' => 'ingredients', 'ingredients' => []]],
+    ];
+    $this->put(route('admin.products.update', $variant->product_id), $payload)->assertSessionHasErrors('variants.1.stock.ingredients');
+    expect($variant->product->fresh()->name)->toBe($originalName)
+        ->and($variant->recipeItems()->first()->quantity)->toBe('18.000');
+    $this->assertDatabaseCount('product_variants', 1);
+    $this->assertDatabaseCount('stock_movements', 0);
+});
+
+test('invalid recipe quantities and inactive ingredients cannot be saved', function (mixed $quantity, bool $active, string $field): void {
+    $stock = StockItem::factory()->create(['base_unit' => 'g', 'on_hand_qty' => 0, 'is_active' => $active]);
+    $payload = finishedProductPayload(0);
+    $payload['variants'][0]['stock'] = ['kind' => 'ingredients', 'ingredients' => [['stock_item_id' => $stock->id, 'quantity' => $quantity]]];
+    $this->post(route('admin.products.store'), $payload)->assertSessionHasErrors('variants.0.stock.ingredients.0.'.$field);
+    $this->assertDatabaseCount('products', 0);
+    $this->assertDatabaseCount('recipe_items', 0);
+})->with([[0, true, 'quantity'], [null, true, 'quantity'], ['0.0001', true, 'quantity'], [18, false, 'stock_item_id']]);
+
+test('stock configuration rejects empty recipes even outside product form validation', function (): void {
+    $variant = ProductVariant::factory()->create();
+    expect(fn () => app(ProductStockConfiguration::class)->save($variant, ['kind' => 'ingredients', 'ingredients' => []], true, auth()->id()))
+        ->toThrow(ValidationException::class);
+    $this->assertDatabaseCount('recipe_items', 0);
 });
