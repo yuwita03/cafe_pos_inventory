@@ -17,3 +17,7 @@ guest receipt, order privacy, and customer history (future consideration, not im
 - Guest access lasts while that browser session remains valid; clearing cookies, session expiry, or another browser/device loses access. Staff can help retrieve the order through authenticated staff tools.
 - Customer login is separate from staff login. Logged-in customers can see their own order history and receipts across devices, with account ownership checked on the backend.
 - Keep existing staff login and role permissions for staff access. Payment confirmation still comes from verified backend payment processing.
+
+check if theres race condition in auth and order and CRUD
+
+adding tax

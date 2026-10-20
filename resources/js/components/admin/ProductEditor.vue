@@ -155,6 +155,12 @@ function removeVariant(index: number): void {
     }
     draft.variants.splice(index, 1);
 }
+function revealInvalidSection(event: Event): void {
+    const section = (event.target as HTMLElement).closest('details');
+    if (section) {
+        section.open = true;
+    }
+}
 async function save(): Promise<void> {
     if (props.processing) {
         return;
@@ -211,7 +217,12 @@ async function save(): Promise<void> {
         :title="product ? 'Edit produk' : 'Tambah produk'"
         @close="close"
     >
-        <form id="product-form" class="product-editor" @submit.prevent="save">
+        <form
+            id="product-form"
+            class="product-editor"
+            @submit.prevent="save"
+            @invalid.capture="revealInvalidSection"
+        >
             <div
                 class="editor-fields"
                 tabindex="0"
@@ -230,16 +241,20 @@ async function save(): Promise<void> {
                 <p class="form-intro">
                     Lengkapi informasi produk yang akan tampil di menu café.
                 </p>
-                <section class="form-section">
-                    <h3><span>01</span>Informasi produk</h3>
+                <details
+                    class="form-section product-form-section"
+                    :open="Object.keys(errors).length > 0 || !!formError"
+                >
+                    <summary>
+                        <h3><span>01</span>Informasi produk</h3>
+                    </summary>
                     <label class="field"
                         >Nama produk <span class="required-mark">*</span
                         ><input
                             v-model="draft.name"
                             required
                             maxlength="120"
-                            placeholder="Contoh: Americano"
-                            autofocus /></label
+                            placeholder="Contoh: Americano" /></label
                     ><label class="field"
                         >Kategori <span class="required-mark">*</span
                         ><select v-model="draft.categoryId" required>
@@ -311,15 +326,20 @@ async function save(): Promise<void> {
                             disimpan.</small
                         >
                     </div>
-                </section>
-                <section class="form-section">
-                    <div class="section-heading price-section-heading">
+                </details>
+                <details
+                    class="form-section product-form-section"
+                    :open="Object.keys(errors).length > 0 || !!formError"
+                >
+                    <summary>
                         <h3>
                             <span>02</span
                             >{{
                                 hasVariants ? 'Varian & harga' : 'Harga produk'
                             }}
                         </h3>
+                    </summary>
+                    <div class="section-heading price-section-heading">
                         <BaseButton
                             v-if="!hasVariants"
                             variant="ghost"
@@ -409,7 +429,7 @@ async function save(): Promise<void> {
                             </button>
                         </div>
                     </template>
-                </section>
+                </details>
                 <ProductStockSetup
                     ref="stockEditor"
                     :product-name="draft.name"
@@ -419,9 +439,14 @@ async function save(): Promise<void> {
                     :errors="errors"
                     @change="stockDirty = true"
                 />
-                <section class="form-section">
-                    <div class="section-heading options-section-heading">
+                <details
+                    class="form-section product-form-section"
+                    :open="Object.keys(errors).length > 0 || !!formError"
+                >
+                    <summary>
                         <h3><span>04</span>Pilihan tambahan</h3>
+                    </summary>
+                    <div class="section-heading options-section-heading">
                         <label class="check-label options-toggle">
                             <input
                                 v-model="optionsEnabled"
@@ -487,7 +512,7 @@ async function save(): Promise<void> {
                             >
                         </div>
                     </template>
-                </section>
+                </details>
                 <p v-if="formError" role="alert" class="field-error">
                     {{ formError }}
                 </p>

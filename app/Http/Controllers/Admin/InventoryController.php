@@ -54,7 +54,7 @@ class InventoryController extends Controller
             ]),
             'stockMovements' => StockMovement::with('actor')->orderByDesc('created_at')->orderByDesc('id')->get()->map(fn (StockMovement $movement): array => [
                 'id' => $movement->id, 'stockId' => $movement->stock_item_id, 'delta' => (float) $movement->quantity_delta,
-                'reason' => $movement->reason, 'source' => str_starts_with($movement->reason, 'Order ORD-') ? 'Penjualan' : 'Adjustment', 'actor' => $movement->actor->name ?? 'Tanpa akun (lokal)',
+                'reason' => $movement->reason, 'source' => str_starts_with($movement->reason, 'Pembelian BUY-') ? 'Pembelian' : (str_starts_with($movement->reason, 'Order ORD-') ? 'Penjualan' : 'Adjustment'), 'actor' => $movement->actor->name ?? 'Tanpa akun (lokal)',
                 'time' => $movement->created_at->timezone(config('app.timezone'))->format('d M Y H:i T'),
             ]),
             'variantRecipes' => $recipes,

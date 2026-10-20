@@ -10,6 +10,7 @@
         </testsuite>
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
+            <file>tests/StaffConcurrencyTest.php</file>
         </testsuite>
     </testsuites>
     <source>

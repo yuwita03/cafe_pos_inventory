@@ -213,8 +213,14 @@ defineExpose({ getSettings, validate });
 </script>
 
 <template>
-    <section class="form-section" @input="markChanged">
-        <h3><span>03</span>Pengurangan stok</h3>
+    <details
+        class="form-section product-form-section"
+        :open="!!localError || stockErrors.length > 0"
+        @input="markChanged"
+    >
+        <summary>
+            <h3><span>03</span>Pengurangan stok</h3>
+        </summary>
         <fieldset class="stock-configuration-fields" :disabled="processing">
             <legend class="sr-only">Pengaturan stok setiap varian</legend>
             <p class="field-help">
@@ -519,7 +525,7 @@ defineExpose({ getSettings, validate });
                 </p>
             </div>
         </fieldset>
-    </section>
+    </details>
 </template>
 
 <style scoped>

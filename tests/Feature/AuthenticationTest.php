@@ -69,7 +69,7 @@ test('login validates required fields', function () {
 });
 
 test('five failed attempts block login temporarily and the limit expires', function () {
-    $owner = User::factory()->create();
+    $owner = User::factory()->create(['role' => 'owner']);
     for ($attempt = 0; $attempt < 5; $attempt++) {
         $this->post(route('login.store'), ['email' => $owner->email, 'password' => 'incorrect'])
             ->assertSessionHasErrors('email');

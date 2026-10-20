@@ -13,4 +13,12 @@ export type User = {
 
 export type Auth = {
     user: User | null;
+    capabilities: Record<
+        | 'manage-workspace'
+        | 'manage-purchasing'
+        | 'manage-staff'
+        | 'use-pos'
+        | 'use-kitchen',
+        boolean
+    >;
 };

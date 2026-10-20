@@ -7,14 +7,14 @@ import { logout } from '@/routes';
 const emit = defineEmits<{ navigate: [] }>();
 const page = usePage();
 const navigation = computed(() =>
-    adminNavigation.map((group) => ({
-        ...group,
-        items: group.items.filter(
-            (item) =>
-                !('ownerOnly' in item) ||
-                page.props.auth.user?.role === 'owner',
-        ),
-    })),
+    adminNavigation
+        .map((group) => ({
+            ...group,
+            items: group.items.filter(
+                (item) => page.props.auth.capabilities[item.capability],
+            ),
+        }))
+        .filter((group) => group.items.length > 0),
 );
 const currentPath = computed(() => page.url.split('?')[0]);
 const navigationId = useId();

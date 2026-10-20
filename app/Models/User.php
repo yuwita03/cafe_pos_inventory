@@ -30,6 +30,15 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
+    public function landingRoute(): string
+    {
+        return match ($this->role) {
+            'cashier' => 'admin.pos',
+            'kitchen' => 'admin.kitchen',
+            default => 'admin.dashboard',
+        };
+    }
+
     /**
      * Get the attributes that should be cast.
      *

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router, usePoll } from '@inertiajs/vue3';
+import { Head, Link, router, usePage, usePoll } from '@inertiajs/vue3';
 import { computed, nextTick, ref } from 'vue';
 import '../../../../css/kitchen.css';
 import AppIcon from '@/components/AppIcon.vue';
@@ -11,6 +11,8 @@ import { orderStates, type OrderData } from '@/types/orders';
 
 defineOptions({ layout: AdminLayout });
 const props = defineProps<{ orders: OrderData[] }>();
+const page = usePage();
+const canUsePos = computed(() => page.props.auth.capabilities['use-pos']);
 type KitchenFilter = 'active' | 'queued' | 'preparing' | 'ready' | 'completed';
 const filter = ref<KitchenFilter>('active');
 const notice = ref('');
@@ -164,7 +166,7 @@ function advance(order: OrderData, event: MouseEvent): void {
                 <h1>Kitchen</h1>
                 <p>Antrean pesanan tunai yang sudah dikonfirmasi kasir.</p>
             </div>
-            <Link :href="pos()" class="button"
+            <Link v-if="canUsePos" :href="pos()" class="button"
                 ><AppIcon name="pos" :size="18" />Buka kasir POS</Link
             >
         </header>
@@ -330,6 +332,7 @@ function advance(order: OrderData, event: MouseEvent): void {
                         <AppIcon name="check" :size="18" />Pemrosesan selesai
                     </div>
                     <Link
+                        v-if="canUsePos"
                         :href="orders({ query: { order: order.number } })"
                         class="kitchen-order-link"
                         >Lihat detail pesanan<AppIcon name="arrow" :size="14"
@@ -350,12 +353,17 @@ function advance(order: OrderData, event: MouseEvent): void {
                 {{
                     filter === 'completed'
                         ? 'Pesanan yang diselesaikan akan muncul di sini.'
-                        : 'Coba filter lain atau buat pesanan tunai dari POS.'
+                        : canUsePos
+                          ? 'Coba filter lain atau buat pesanan tunai dari POS.'
+                          : 'Coba filter lain atau tunggu pesanan yang dikonfirmasi kasir.'
                 }}
             </p>
             <BaseButton v-if="filter !== 'active'" @click="filter = 'active'"
                 >Lihat semua aktif</BaseButton
-            ><Link v-else :href="pos()" class="button button-primary"
+            ><Link
+                v-else-if="canUsePos"
+                :href="pos()"
+                class="button button-primary"
                 >Buat pesanan di POS</Link
             >
         </section>
