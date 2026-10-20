@@ -12,13 +12,30 @@ import {
     kitchen,
 } from '@/routes/admin';
 import { index as inventory, recipes, history } from '@/routes/admin/inventory';
+import type { Auth } from '@/types';
 
-export const adminNavigation = [
+type NavigationItem = {
+    label: string;
+    capability: keyof Auth['capabilities'];
+    description: string;
+    icon: string;
+    href: typeof dashboard;
+    prototype?: boolean;
+    placeholder?: boolean;
+    ownerOnly?: boolean;
+};
+
+export const adminNavigation: {
+    label: string;
+    icon?: string;
+    items: NavigationItem[];
+}[] = [
     {
         label: 'Workspace',
         items: [
             {
                 label: 'Dashboard',
+                capability: 'manage-workspace' as const,
                 description: 'Ringkasan operasional',
                 icon: 'grid',
                 href: dashboard,
@@ -32,18 +49,21 @@ export const adminNavigation = [
         items: [
             {
                 label: 'Produk',
+                capability: 'manage-workspace' as const,
                 description: 'Menu & varian',
                 icon: 'coffee',
                 href: menu,
             },
             {
                 label: 'Kategori',
+                capability: 'manage-workspace' as const,
                 description: 'Kelompok menu',
                 icon: 'category',
                 href: categories,
             },
             {
                 label: 'Grup opsi',
+                capability: 'manage-workspace' as const,
                 description: 'Pilihan pelanggan',
                 icon: 'options',
                 href: options,
@@ -56,18 +76,21 @@ export const adminNavigation = [
         items: [
             {
                 label: 'Stok',
+                capability: 'manage-workspace' as const,
                 description: 'Bahan & pastry',
                 icon: 'category',
                 href: inventory,
             },
             {
                 label: 'Resep & opsi',
+                capability: 'manage-workspace' as const,
                 description: 'Per varian & sugar',
                 icon: 'coffee',
                 href: recipes,
             },
             {
                 label: 'Riwayat stok',
+                capability: 'manage-workspace' as const,
                 description: 'Movement & adjustment',
                 icon: 'history',
                 href: history,
@@ -80,17 +103,19 @@ export const adminNavigation = [
         items: [
             {
                 label: 'Supplier',
+                capability: 'manage-purchasing' as const,
                 description: 'Pemasok café',
                 icon: 'category',
                 href: suppliers,
-                placeholder: true,
+                ownerOnly: true,
             },
             {
                 label: 'Pembelian',
+                capability: 'manage-purchasing' as const,
                 description: 'Draft & penerimaan',
                 icon: 'purchase',
                 href: purchases,
-                placeholder: true,
+                ownerOnly: true,
             },
         ],
     },
@@ -100,6 +125,7 @@ export const adminNavigation = [
         items: [
             {
                 label: 'Kasir POS',
+                capability: 'use-pos' as const,
                 description: 'Dine-in & takeaway',
                 icon: 'pos',
                 href: pos,
@@ -107,6 +133,7 @@ export const adminNavigation = [
             },
             {
                 label: 'Kitchen',
+                capability: 'use-kitchen' as const,
                 description: 'Antrean berbayar',
                 icon: 'coffee',
                 href: kitchen,
@@ -114,6 +141,7 @@ export const adminNavigation = [
             },
             {
                 label: 'Pesanan',
+                capability: 'use-pos' as const,
                 description: 'Order & pembayaran',
                 icon: 'orders',
                 href: orders,
@@ -121,6 +149,7 @@ export const adminNavigation = [
             },
             {
                 label: 'Meja & QR',
+                capability: 'manage-workspace' as const,
                 description: 'Meja dan menu QR',
                 icon: 'grid',
                 href: tables,
@@ -134,10 +163,10 @@ export const adminNavigation = [
         items: [
             {
                 label: 'Staf & login',
+                capability: 'manage-staff' as const,
                 description: 'Akun & fixed roles',
                 icon: 'staff',
                 href: staff,
-                placeholder: true,
             },
         ],
     },

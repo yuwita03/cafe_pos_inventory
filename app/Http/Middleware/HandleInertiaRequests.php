@@ -40,6 +40,8 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => [
                 'user' => $request->user(),
+                'capabilities' => collect(['manage-workspace', 'manage-purchasing', 'manage-staff', 'use-pos', 'use-kitchen'])
+                    ->mapWithKeys(fn (string $ability): array => [$ability => $request->user()?->can($ability) ?? false])->all(),
             ],
         ];
     }

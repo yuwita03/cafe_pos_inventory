@@ -292,12 +292,12 @@ test('menu edits preserve variant recipe identity and prevent removing a referen
 });
 
 test('adjustments record the actual user and reject replay against another stock item', function (): void {
-    $actor = User::factory()->create();
+    $actor = User::factory()->create(['role' => 'owner']);
     $first = StockItem::factory()->create();
     $second = StockItem::factory()->create();
     $payload = inventoryAdjustment($first, '1');
 
-    $this->actingAs($actor)->post(route('admin.inventory.adjustments'), $payload)->assertSessionHasNoErrors();
+    $this->actingAs($actor)->post(route('admin.inventory.adjustments'), $payload)->assertRedirect()->assertSessionHasNoErrors();
     $this->post(route('admin.inventory.adjustments'), [...$payload, 'stock_item_id' => $second->id])->assertSessionHasErrors('source_key');
 
     $this->assertDatabaseHas('stock_movements', ['stock_item_id' => $first->id, 'actor_user_id' => $actor->id]);

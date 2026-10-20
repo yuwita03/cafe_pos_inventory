@@ -3,7 +3,7 @@ import { Link } from "@inertiajs/vue3";
 import BaseButton from "@/components/ui/BaseButton.vue";
 import type { TablePagination } from "@/types/menu";
 
-defineProps<{ pagination: TablePagination; busy?: boolean }>();
+withDefaults(defineProps<{ pagination: TablePagination; busy?: boolean; noun?: string }>(), { noun: 'produk' });
 defineEmits<{ limit: [value: number] }>();
 </script>
 
@@ -11,7 +11,7 @@ defineEmits<{ limit: [value: number] }>();
     <footer class="table-pagination">
         <span aria-live="polite"
             >Menampilkan <strong>{{ pagination.from ?? 0 }}–{{ pagination.to ?? 0 }}</strong> dari
-            <strong>{{ pagination.total }}</strong> produk</span
+            <strong>{{ pagination.total }}</strong> {{ noun }}</span
         >
         <div class="pagination-controls">
             <label
@@ -25,7 +25,7 @@ defineEmits<{ limit: [value: number] }>();
                     <option :value="50">50</option>
                 </select></label
             >
-            <nav aria-label="Pagination produk">
+            <nav :aria-label="'Pagination ' + noun">
                 <Link
                     v-if="pagination.prev_page_url && !busy"
                     :href="pagination.prev_page_url"

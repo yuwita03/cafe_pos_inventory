@@ -15,7 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->redirectGuestsTo(fn (): string => route('login'));
-        $middleware->redirectUsersTo(fn (): string => route('admin.dashboard'));
+        $middleware->redirectUsersTo(fn (Request $request): string => route($request->user()->landingRoute()));
         $middleware->web(append: [
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,

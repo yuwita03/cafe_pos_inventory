@@ -12,11 +12,11 @@
 | 02  | F02     | Menu kopi/pastry + variants/options berfungsi   | Todo   |
 | 03  | F03     | Ingredient inventory + coffee recipes berfungsi | Todo   |
 | 04  | FAUTH   | Login/logout dasar untuk staff                  | Todo   |
-| 05  | F07     | Supplier, purchasing, receiving sederhana       | Todo   |
+| 05  | F07     | Supplier, purchasing, receiving sederhana       | Doing  |
 | 06  | F04     | Cashier POS cash dine-in/takeaway               | Todo   |
 | 07  | F06     | Kitchen queue + potong stok sekali              | Todo   |
 | 08  | F05     | Table QR + QRIS verified (+ QRIS cashier)       | Doing  |
-| 09  | F01     | Employees + fixed roles authorization           | Todo   |
+| 09  | F01     | Employees + fixed roles authorization           | Awaiting Approval |
 | 10  | F09/F10 | Dashboard, testing & release hardening          | Todo   |
 |     |         |                                                 |        |
 |     |         |                                                 |        |
@@ -63,6 +63,24 @@
 **Done jika:** staf bisa login dan akses management terlindungi. **Belum perlu employee CRUD / full roles.**
 
 ## 05 — Suppliers & Purchasing
+
+**Status: Doing — implementasi selesai, pemeriksaan UI manual menunggu.** Supplier, form/list/detail draft pembelian, pembatalan, owner-only access, dan receiving atomik terhubung ke backend. Migration purchasing sudah diterapkan pada database lokal; draft tidak mengubah stok dan receiving berulang tidak menggandakan saldo/movement.
+
+**Verifikasi (2026-10-19):** `php artisan test --compact tests/Feature/PurchasingTest.php tests/Feature/InventoryManagementTest.php tests/Feature/AuthenticationTest.php` lulus **74 tests / 764 assertions**, termasuk rollback multi-item, supplier/item nonaktif, terminal states, otorisasi, dan dua proses receiving yang benar-benar menunggu lock PostgreSQL. `composer types:check -- --memory-limit=512M`, `npm.cmd run types:check`, `npm.cmd run build`, pemeriksaan frontend terarah dengan `vp.cmd check`, `php vendor/bin/pint --dirty --format agent`, serta `git diff --check` lulus. Independent review kode stok/otorisasi dan concurrency test: tidak ada temuan blocking.
+
+**Batas verifikasi:** browser tidak tersedia pada sesi ini, sehingga navigasi, dialog penerimaan, dan layout responsive belum diperiksa secara visual. Checklist tetap menunggu UI manual; setelah pemeriksaan tersebut lulus, pindahkan ke Awaiting Approval. Full suite belum dijalankan; jalankan `php artisan test --compact` sebelum persetujuan akhir.
+
+**Perbaikan tampilan kuantitas (2026-10-19):** kuantitas database `500.000` berarti 500 unit, bukan 500.000 unit. Detail dan dialog penerimaan kini memakai format Indonesia tanpa nol desimal tambahan; input edit menampilkan `500`. Regression test membuktikan input `500` dan `500.125` tersimpan serta diterima tanpa perkalian. Purchasing tests lulus **28 tests / 291 assertions**; frontend check, TypeScript, build, dan Pint lulus. Data pembelian lokal tidak diubah.
+
+**Konfirmasi draft (2026-10-19):** create dan edit meminta konfirmasi sebelum menyimpan, dengan ringkasan barang, kuantitas, dan total biaya. Tombol Batal/kembali dari form meminta konfirmasi membuang perubahan; menutup dialog mempertahankan input. Konfirmasi pembatalan pembelian yang sudah ada tetap dipakai. Frontend check terarah, TypeScript, build, dan diff check lulus; UI manual tetap menunggu browser tersedia. Status tetap Doing.
+
+**Banyak kontak supplier (2026-10-19):** form supplier mendukung Tambah kontak/Hapus dan menampilkan setiap kontak di daftar supplier, maksimal 10 entri opsional. Kontak lama dipertahankan; migration memperluas kolom contact menjadi text dan sudah diterapkan lokal. Purchasing tests lulus **33 tests / 334 assertions**, termasuk penyimpanan/edit/penghapusan beberapa kontak, data lama saat migration, validasi per kontak, dan total teks melampaui batas lama. PHPStan, TypeScript, frontend check, build, Pint, dan diff check lulus. UI manual dan full suite tetap belum dijalankan; status Doing.
+
+**Konfirmasi supplier (2026-10-19):** create/edit supplier menampilkan modal konfirmasi berisi nama, semua kontak, dan status sebelum request simpan. Membatalkan form yang memiliki perubahan juga memakai modal Buang perubahan, menggantikan browser confirm. Kembali ke form mempertahankan input; konfirmasi buang hanya menutup form tanpa mengubah data tersimpan. Error validasi menutup konfirmasi dan tetap menampilkan form. Frontend check, TypeScript, build, dan diff check lulus; UI manual tetap belum tersedia. Status Doing.
+
+**Jenis kontak supplier (2026-10-19):** setiap kontak kini memiliki pilihan Telepon/Email saja, dengan input dan validasi sesuai jenis. Jenis dan nilai tampil di tabel supplier serta modal konfirmasi. Data lama dikonversi tanpa menghapus nilai kontak; migration lokal sudah diterapkan. Purchasing tests lulus **39 tests / 352 assertions**, termasuk migrasi kontak lama, edit/simpan beberapa kontak, penolakan jenis/email/telepon tidak valid, serta preservasi awalan +62 dan nol awal. PHPStan, TypeScript, frontend check, build, Pint, dan diff check lulus. UI manual dan full suite masih menunggu; status Doing.
+
+**Kontak default (2026-10-19):** form supplier dimulai dengan dua input tetap Telepon dan Email. Dropdown pada +Tambah kontak menawarkan Telepon/Email; input tambahan baru muncul setelah jenis dipilih, dengan tombol Hapus. Dropdown jenis tidak lagi ditampilkan pada setiap baris. Saat edit, kontak yang tersimpan mengisi input sesuai jenisnya. Kedua input default tetap opsional. Frontend check, TypeScript, build, dan diff check lulus; status Doing, UI manual belum tersedia.
 
 - [ ] Bisa mengelola supplier serta mencatat draft pembelian dan item/biayanya.
 - [ ] Owner bisa menerima **seluruh** pembelian sehingga stok bertambah; draft tidak mengubah stok.
@@ -118,9 +136,11 @@
 
 ## 09 — Employees & Fixed Roles
 
-- [ ] Owner bisa tambah/nonaktifkan akun pegawai; role `owner/cashier/kitchen` tetap.
-- [ ] Policy/Gate/backend membatasi owner management, cashier POS dan kitchen operations.
-- [ ] Test unauthorized API/request ditolak, bukan cuma menyembunyikan tombol UI.
+**Awaiting Approval:** halaman staf tersambung ke tabel users existing: tambah/edit akun, pencarian/filter/pagination, role tetap, aktif/nonaktif, reset password dan sesi. Gate membatasi seluruh management/POS/kitchen routes; sidebar dan tautan kitchen mengikuti capability server, login menuju area sesuai role. Owner tidak dapat demote/nonaktifkan diri; update mengunci akun berurutan dan memeriksa ulang actor untuk menjaga owner aktif saat request bersamaan. Tidak ada migration/dependency baru. Verifikasi: `php artisan test --compact tests/Feature tests/StaffConcurrencyTest.php` **311 passed / 3373 assertions**, termasuk dua worker PostgreSQL yang benar-benar menunggu row lock untuk demotion/deactivation dan regresi reset password dengan session database. Vue types, PHPStan, lint/format, production build dan diff check lulus. Review independen: masalah self-session reset dan tautan kitchen telah diperbaiki; snapshot statistik polling test juga diperbaiki dan diuji ulang. Browser tidak terhubung, sehingga tampilan desktop/mobile belum diperiksa visual. Suite lengkap `php artisan test --compact` diminta pada handoff; menunggu persetujuan pengguna.
+
+- [x] Owner bisa tambah/nonaktifkan akun pegawai; role `owner/cashier/kitchen` tetap.
+- [x] Policy/Gate/backend membatasi owner management, cashier POS dan kitchen operations.
+- [x] Test unauthorized API/request ditolak, bukan cuma menyembunyikan tombol UI.
 
 **Done jika:** tiap role hanya bisa melakukan tugasnya. Wajib sebelum akses publik.
 

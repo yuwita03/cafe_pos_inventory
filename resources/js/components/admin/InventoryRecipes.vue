@@ -78,9 +78,6 @@ const ingredients = computed(() =>
         .filter((item) => item.active && item.unit !== 'pcs')
         .toSorted((a, b) => a.name.localeCompare(b.name, 'id') || a.id - b.id),
 );
-const quickIngredients = computed(() =>
-    ingredients.value.filter((item) => item.quickAdd),
-);
 const remainingIngredients = computed(() =>
     ingredients.value.filter(
         (item) => !draft.ingredients.some((row) => row.stockId === item.id),
@@ -998,51 +995,6 @@ onBeforeUnmount(() => {
                         >
                     </template>
                     <template v-else>
-                        <section
-                            class="recipe-quick-add"
-                            aria-label="Tambah cepat bahan"
-                        >
-                            <div class="recipe-picker-heading">
-                                <h3>Tambah cepat</h3>
-                                <span>Diatur oleh owner di halaman Stok</span>
-                            </div>
-                            <div
-                                v-if="quickIngredients.length"
-                                class="recipe-quick-buttons"
-                            >
-                                <button
-                                    v-for="item in quickIngredients"
-                                    :key="item.id"
-                                    type="button"
-                                    :disabled="
-                                        draft.ingredients.some(
-                                            (row) => row.stockId === item.id,
-                                        )
-                                    "
-                                    :aria-label="
-                                        'Tambah ' + item.name + ' ke resep'
-                                    "
-                                    @click="selectIngredient(item)"
-                                >
-                                    <AppIcon
-                                        :name="
-                                            draft.ingredients.some(
-                                                (row) =>
-                                                    row.stockId === item.id,
-                                            )
-                                                ? 'check'
-                                                : 'plus'
-                                        "
-                                        :size="15"
-                                    /><span>{{ item.name }}</span
-                                    ><small>{{ item.unit }}</small>
-                                </button>
-                            </div>
-                            <p v-else class="field-help">
-                                Belum ada pintasan. Aktifkan toggle “Tambah
-                                cepat” pada baris bahan di halaman Stok.
-                            </p>
-                        </section>
                         <div
                             v-for="(row, index) in draft.ingredients"
                             :key="index"
