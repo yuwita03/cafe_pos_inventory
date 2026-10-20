@@ -1,73 +1,130 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import AppIcon from '@/components/AppIcon.vue';
 import AdminLayout from '@/layouts/AdminLayout.vue';
-import { menu } from '@/routes/admin';
-import { formatRupiah as rupiah } from '@/lib/utils';
+import { dashboard, menu } from '@/routes/admin';
+import { formatQuantity, formatRupiah as rupiah } from '@/lib/utils';
+
+type Period =
+    | 'today'
+    | 'yesterday'
+    | 'this_week'
+    | 'last_week'
+    | 'this_month'
+    | 'last_month'
+    | 'custom';
+
+interface DashboardAnalytics {
+    period: {
+        selected: Period;
+        label: string;
+        start: string;
+        end: string;
+        comparisonLabel: string;
+        timezone: string;
+        today: string;
+        cutoff: string | null;
+        options: Array<{ value: Period; label: string }>;
+    };
+    summary: {
+        confirmedRevenue: number;
+        paidOrders: number;
+        averageOrderValue: number;
+        itemsSold: number;
+        paymentReviews: number;
+    };
+    comparison: {
+        confirmedRevenue: number | null;
+        paidOrders: number | null;
+        averageOrderValue: number | null;
+        itemsSold: number | null;
+    };
+    chart: {
+        granularity: 'day' | 'week' | 'month';
+        points: Array<{
+            start: string;
+            end: string;
+            label: string;
+            revenue: number;
+        }>;
+    };
+    topProducts: Array<{ name: string; quantity: number }>;
+    lowStock: Array<{
+        id: number;
+        name: string;
+        unit: string;
+        available: number;
+        threshold: number;
+    }>;
+}
 
 defineOptions({ layout: AdminLayout });
-const period = ref<'current' | 'previous'>('current');
-const periods = {
-    current: {
-        label: '5–11 Oktober 2026',
-        sales: [420000, 650000, 510000, 370000, 780000, 1120000, 630000],
-        orders: 160,
-        items: 178,
-        review: 2,
-        products: [
-            { name: 'Americano', category: 'Coffee', quantity: 46 },
-            { name: 'Latte', category: 'Coffee', quantity: 38 },
-            { name: 'Cappuccino', category: 'Coffee', quantity: 25 },
-            { name: 'Croissant', category: 'Pastry', quantity: 23 },
-            { name: 'Chocolate', category: 'Non-Coffee', quantity: 20 },
-        ],
-    },
-    previous: {
-        label: '28 September–4 Oktober 2026',
-        sales: [350000, 580000, 460000, 420000, 690000, 980000, 550000],
-        orders: 144,
-        items: 160,
-        review: 1,
-        products: [
-            { name: 'Latte', category: 'Coffee', quantity: 40 },
-            { name: 'Americano', category: 'Coffee', quantity: 34 },
-            { name: 'Croissant', category: 'Pastry', quantity: 26 },
-            { name: 'Cappuccino', category: 'Coffee', quantity: 22 },
-            { name: 'Chocolate', category: 'Non-Coffee', quantity: 18 },
-        ],
-    },
-};
-const data = computed(() => periods[period.value]);
-const totalSales = computed(() =>
-    data.value.sales.reduce((total, value) => total + value, 0),
-);
-const maximum = 1200000;
+const { analytics } = defineProps<{ analytics: DashboardAnalytics }>();
+const form = useForm({
+    period: analytics.period.selected,
+    start: analytics.period.start,
+    end: analytics.period.end,
+});
 const selectedDay = ref<number | null>(null);
-const days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
-const lowStock = [
-    {
-        name: 'Coffee beans',
-        unit: 'g',
-        available: 350,
-        threshold: 500,
-        icon: 'coffee',
-    },
-    {
-        name: 'Fresh milk',
-        unit: 'ml',
-        available: 800,
-        threshold: 1000,
-        icon: 'category',
-    },
-    {
-        name: 'Croissant',
-        unit: 'pcs',
-        available: 4,
-        threshold: 10,
-        icon: 'image',
-    },
-];
+const selectedSale = computed(() =>
+    selectedDay.value === null
+        ? null
+        : (analytics.chart.points[selectedDay.value] ?? null),
+);
+const maximum = computed(() =>
+    Math.max(...analytics.chart.points.map((sale) => sale.revenue), 1),
+);
+const axisValues = computed(() =>
+    [1, 0.75, 0.5, 0.25, 0].map((ratio) =>
+        rupiah(Math.round(maximum.value * ratio)),
+    ),
+);
+
+function changePeriod(): void {
+    form.clearErrors();
+    if (form.period !== 'custom') {
+        applyPeriod();
+    }
+}
+
+function applyPeriod(): void {
+    selectedDay.value = null;
+    form.transform((data) =>
+        data.period === 'custom' ? data : { period: data.period },
+    ).get(dashboard.url(), {
+        preserveScroll: true,
+        preserveState: 'errors',
+    });
+}
+
+function comparisonText(value: number | null): string {
+    if (value === null) {
+        return 'Belum ada pembanding';
+    }
+    if (value === 0) {
+        return 'Tetap dari periode pembanding';
+    }
+
+    return `${value > 0 ? '+' : ''}${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 }).format(value)}% dari periode pembanding`;
+}
+
+const chartHeading = computed(
+    () =>
+        ({
+            day: 'Penjualan harian',
+            week: 'Penjualan mingguan',
+            month: 'Penjualan bulanan',
+        })[analytics.chart.granularity],
+);
+
+function stockPercentage(item: DashboardAnalytics['lowStock'][number]): number {
+    if (item.threshold <= 0) {
+        return item.available > 0 ? 100 : 0;
+    }
+
+    return Math.max(0, Math.min(100, (item.available / item.threshold) * 100));
+}
 </script>
 
 <template>
@@ -82,34 +139,109 @@ const lowStock = [
                     tempat.
                 </p>
             </div>
-            <label class="dashboard-period"
-                ><span>Periode contoh</span
-                ><select
-                    v-model="period"
-                    aria-label="Pilih periode data contoh"
-                    @change="selectedDay = null"
+            <form class="dashboard-filter" @submit.prevent="applyPeriod">
+                <label class="dashboard-period"
+                    ><span>Periode laporan</span
+                    ><select
+                        v-model="form.period"
+                        :disabled="form.processing"
+                        aria-label="Pilih periode laporan"
+                        @change="changePeriod"
+                    >
+                        <option
+                            v-for="option in analytics.period.options"
+                            :key="option.value"
+                            :value="option.value"
+                        >
+                            {{ option.label }}
+                        </option>
+                    </select></label
                 >
-                    <option value="current">5–11 Okt 2026</option>
-                    <option value="previous">28 Sep–4 Okt 2026</option>
-                </select></label
-            >
+                <div v-if="form.period === 'custom'" class="custom-dates">
+                    <label>
+                        <span>Tanggal mulai</span>
+                        <input
+                            v-model="form.start"
+                            type="date"
+                            required
+                            :max="analytics.period.today"
+                            :disabled="form.processing"
+                            :aria-invalid="Boolean(form.errors.start)"
+                            aria-describedby="start-error"
+                        />
+                        <small
+                            v-if="form.errors.start"
+                            id="start-error"
+                            class="filter-error"
+                            role="alert"
+                            >{{ form.errors.start }}</small
+                        >
+                    </label>
+                    <label>
+                        <span>Tanggal akhir</span>
+                        <input
+                            v-model="form.end"
+                            type="date"
+                            required
+                            :min="form.start"
+                            :max="analytics.period.today"
+                            :disabled="form.processing"
+                            :aria-invalid="Boolean(form.errors.end)"
+                            aria-describedby="end-error"
+                        />
+                        <small
+                            v-if="form.errors.end"
+                            id="end-error"
+                            class="filter-error"
+                            role="alert"
+                            >{{ form.errors.end }}</small
+                        >
+                    </label>
+                    <button
+                        type="submit"
+                        class="filter-apply"
+                        :disabled="form.processing"
+                    >
+                        {{ form.processing ? 'Memuat…' : 'Terapkan' }}
+                    </button>
+                </div>
+                <small
+                    v-if="form.errors.period"
+                    class="filter-error"
+                    role="alert"
+                    >{{ form.errors.period }}</small
+                >
+            </form>
         </div>
         <div class="dashboard-demo">
             <AppIcon name="info" :size="18" />
             <p>
-                <strong>Pratinjau dashboard</strong> Seluruh angka dan grafik di
-                bawah adalah data contoh, bukan transaksi café.
+                <strong>Data transaksi</strong> Penjualan dihitung dari
+                pembayaran yang sudah terkonfirmasi.
             </p>
-            <span>DATA CONTOH</span>
+            <span
+                >{{ analytics.period.label }} ·
+                {{ analytics.period.timezone }}</span
+            >
         </div>
+        <p class="report-comparison">
+            Dibandingkan dengan {{ analytics.period.comparisonLabel }} · WIB
+            <span v-if="analytics.period.cutoff">
+                · Data dan pembanding hingga {{ analytics.period.cutoff }}</span
+            >
+        </p>
         <div class="dashboard-metrics">
             <article>
                 <div class="metric-label">
                     <AppIcon name="coffee" :size="18" />Penjualan
                     terkonfirmasi<span class="metric-marker">IDR</span>
                 </div>
-                <strong class="metric-value">{{ rupiah(totalSales) }}</strong>
-                <p>Contoh pembayaran terverifikasi · {{ data.label }}</p>
+                <strong class="metric-value">{{
+                    rupiah(analytics.summary.confirmedRevenue)
+                }}</strong>
+                <p>
+                    {{ comparisonText(analytics.comparison.confirmedRevenue) }}
+                </p>
             </article>
             <article>
                 <div class="metric-label">
@@ -119,9 +251,10 @@ const lowStock = [
                     >
                 </div>
                 <strong class="metric-value"
-                    >{{ data.orders }}<small>pesanan</small></strong
+                    >{{ analytics.summary.paidOrders
+                    }}<small>pesanan</small></strong
                 >
-                <p>Data contoh pada periode terpilih</p>
+                <p>{{ comparisonText(analytics.comparison.paidOrders) }}</p>
             </article>
             <article>
                 <div class="metric-label">
@@ -129,9 +262,9 @@ const lowStock = [
                     perhatian<span class="metric-marker">STOK</span>
                 </div>
                 <strong class="metric-value"
-                    >{{ lowStock.length }}<small>item</small></strong
+                    >{{ analytics.lowStock.length }}<small>item</small></strong
                 >
-                <p>Kondisi stok contoh saat ini · di luar filter periode</p>
+                <p>Kondisi stok saat ini · di luar filter periode</p>
             </article>
         </div>
         <div class="dashboard-middle">
@@ -142,63 +275,75 @@ const lowStock = [
                 <header class="dashboard-panel-heading">
                     <div>
                         <h2 id="sales-heading">Ringkasan penjualan</h2>
-                        <p>Contoh penjualan harian · {{ data.label }}</p>
+                        <p>{{ chartHeading }} · {{ analytics.period.label }}</p>
                     </div>
                     <span class="dashboard-panel-tag"><span />Dibayar</span>
                 </header>
                 <div class="sales-total">
-                    <strong>{{ rupiah(totalSales) }}</strong
-                    ><span>Total periode contoh</span>
+                    <strong>{{
+                        rupiah(analytics.summary.confirmedRevenue)
+                    }}</strong
+                    ><span>Total periode terpilih</span>
                 </div>
-                <div class="sales-chart">
-                    <div class="chart-axis" aria-hidden="true">
-                        <span>Rp1,2 jt</span><span>Rp900 rb</span
-                        ><span>Rp600 rb</span><span>Rp300 rb</span
-                        ><span>Rp0</span>
-                    </div>
-                    <div class="chart-plot">
-                        <div class="chart-grid" aria-hidden="true">
-                            <i /><i /><i /><i /><i />
-                        </div>
-                        <div class="chart-bars">
-                            <button
-                                v-for="(sale, index) in data.sales"
+                <div class="sales-chart-scroll">
+                    <div
+                        class="sales-chart"
+                        :style="{
+                            minWidth: `${Math.max(280, analytics.chart.points.length * 70 + 66)}px`,
+                        }"
+                    >
+                        <div class="chart-axis" aria-hidden="true">
+                            <span
+                                v-for="(value, index) in axisValues"
                                 :key="index"
-                                class="chart-bar-column"
-                                :class="{
-                                    highlighted:
-                                        selectedDay === index ||
-                                        (selectedDay === null && index === 5),
-                                }"
-                                :aria-label="`${days[index]}: ${rupiah(sale)}, data contoh`"
-                                :aria-pressed="selectedDay === index"
-                                @click="
-                                    selectedDay =
-                                        selectedDay === index ? null : index
-                                "
+                                >{{ value }}</span
                             >
-                                <span class="chart-bar-slot"
-                                    ><span
-                                        class="chart-bar"
-                                        :style="{
-                                            height: `${(sale / maximum) * 100}%`,
-                                        }"
-                                        ><span class="chart-value">{{
-                                            rupiah(sale)
-                                        }}</span></span
-                                    ></span
-                                ><span class="chart-day">{{
-                                    days[index]
-                                }}</span>
-                            </button>
+                        </div>
+                        <div class="chart-plot">
+                            <div class="chart-grid" aria-hidden="true">
+                                <i /><i /><i /><i /><i />
+                            </div>
+                            <div class="chart-bars">
+                                <button
+                                    v-for="(sale, index) in analytics.chart
+                                        .points"
+                                    :key="sale.start"
+                                    class="chart-bar-column"
+                                    :class="{
+                                        highlighted: selectedDay === index,
+                                    }"
+                                    :aria-label="`${sale.label}: ${rupiah(sale.revenue)}`"
+                                    :aria-pressed="selectedDay === index"
+                                    @click="
+                                        selectedDay =
+                                            selectedDay === index ? null : index
+                                    "
+                                >
+                                    <span class="chart-bar-slot"
+                                        ><span
+                                            class="chart-bar"
+                                            :style="{
+                                                height: `${(sale.revenue / maximum) * 100}%`,
+                                            }"
+                                            ><span class="chart-value">{{
+                                                rupiah(sale.revenue)
+                                            }}</span></span
+                                        ></span
+                                    ><span class="chart-day">{{
+                                        sale.label.replace(/ \d{4}/g, '')
+                                    }}</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
                 <p class="chart-caption" aria-live="polite">
                     {{
-                        selectedDay === null
-                            ? 'Pilih batang untuk melihat nilai penjualan contoh.'
-                            : `${days[selectedDay]} · ${rupiah(data.sales[selectedDay])} (data contoh)`
+                        selectedSale === null
+                            ? analytics.summary.paidOrders === 0
+                                ? 'Belum ada penjualan pada periode ini.'
+                                : 'Pilih batang untuk melihat nilai penjualan.'
+                            : `${selectedSale.label} · ${rupiah(selectedSale.revenue)}`
                     }}
                 </p>
             </section>
@@ -209,25 +354,34 @@ const lowStock = [
                 <header class="dashboard-panel-heading">
                     <div>
                         <h2 id="business-heading">Sekilas bisnis</h2>
-                        <p>Periode yang sama · data contoh</p>
+                        <p>{{ analytics.period.label }}</p>
                     </div>
                 </header>
                 <div class="business-stat business-lilac">
                     <span>Rata-rata nilai pesanan</span
                     ><strong>{{
-                        rupiah(Math.round(totalSales / data.orders))
+                        rupiah(analytics.summary.averageOrderValue)
                     }}</strong
+                    ><small class="business-comparison">{{
+                        comparisonText(analytics.comparison.averageOrderValue)
+                    }}</small
                     ><AppIcon name="coffee" :size="20" />
                 </div>
                 <div class="business-stat business-peach">
                     <span>Produk terjual</span
-                    ><strong>{{ data.items }}<small>item</small></strong
+                    ><strong
+                        >{{ analytics.summary.itemsSold
+                        }}<small>item</small></strong
+                    ><small class="business-comparison">{{
+                        comparisonText(analytics.comparison.itemsSold)
+                    }}</small
                     ><AppIcon name="category" :size="20" />
                 </div>
                 <div class="business-stat business-sage">
                     <span>Perlu pemeriksaan pembayaran</span
                     ><strong
-                        >{{ data.review }}<small>kasus contoh</small></strong
+                        >{{ analytics.summary.paymentReviews
+                        }}<small>kasus</small></strong
                     ><AppIcon name="info" :size="20" />
                 </div>
                 <p class="business-note">
@@ -244,29 +398,36 @@ const lowStock = [
                 <header class="dashboard-panel-heading">
                     <div>
                         <h2 id="stock-heading">Peringatan stok</h2>
-                        <p>Kondisi contoh saat ini, bukan riwayat periode</p>
+                        <p>Kondisi saat ini, bukan riwayat periode</p>
                     </div>
-                    <span class="stock-count">{{ lowStock.length }} item</span>
+                    <span class="stock-count"
+                        >{{ analytics.lowStock.length }} item</span
+                    >
                 </header>
+                <p v-if="analytics.lowStock.length === 0" class="empty-state">
+                    Tidak ada stok yang perlu diperhatikan.
+                </p>
                 <div
-                    v-for="item in lowStock"
-                    :key="item.name"
+                    v-for="item in analytics.lowStock"
+                    :key="item.id"
                     class="dashboard-stock-row"
                 >
                     <span class="stock-item-icon"
-                        ><AppIcon :name="item.icon" :size="22"
+                        ><AppIcon
+                            :name="item.unit === 'pcs' ? 'image' : 'category'"
+                            :size="22"
                     /></span>
                     <div class="stock-item-info">
                         <h3>{{ item.name }}</h3>
                         <p>
-                            Tersedia {{ item.available }} {{ item.unit
-                            }}<span>·</span>Batas contoh {{ item.threshold }}
-                            {{ item.unit }}
+                            Tersedia {{ formatQuantity(item.available) }}
+                            {{ item.unit }}<span>·</span>Batas
+                            {{ formatQuantity(item.threshold) }} {{ item.unit }}
                         </p>
                         <div class="stock-meter" aria-hidden="true">
                             <span
                                 :style="{
-                                    width: `${(item.available / item.threshold) * 100}%`,
+                                    width: `${stockPercentage(item)}%`,
                                 }"
                             />
                         </div>
@@ -274,7 +435,7 @@ const lowStock = [
                     <span class="stock-warning">Rendah</span>
                 </div>
                 <p class="stock-footnote">
-                    Angka tersedia dan batas di atas hanya ilustrasi tampilan.
+                    Stok tersedia sudah dikurangi reservasi pesanan aktif.
                 </p>
             </section>
             <section
@@ -284,7 +445,10 @@ const lowStock = [
                 <header class="dashboard-panel-heading">
                     <div>
                         <h2 id="top-products-heading">Produk terlaris</h2>
-                        <p>Berdasarkan jumlah item · {{ data.label }}</p>
+                        <p>
+                            Berdasarkan jumlah item ·
+                            {{ analytics.period.label }}
+                        </p>
                     </div>
                     <Link
                         :href="menu()"
@@ -293,41 +457,93 @@ const lowStock = [
                         ><AppIcon name="arrow" :size="18"
                     /></Link>
                 </header>
+                <p
+                    v-if="analytics.topProducts.length === 0"
+                    class="empty-state"
+                >
+                    Belum ada produk terjual pada periode ini.
+                </p>
                 <div
-                    v-for="(product, index) in data.products"
+                    v-for="(product, index) in analytics.topProducts"
                     :key="product.name"
                     class="top-product-row"
                 >
                     <span class="product-rank">{{
                         String(index + 1).padStart(2, '0')
                     }}</span
-                    ><span
-                        class="top-product-image"
-                        :class="{ pastry: product.category === 'Pastry' }"
-                        ><AppIcon
-                            :name="
-                                product.category === 'Pastry'
-                                    ? 'image'
-                                    : 'coffee'
-                            "
-                            :size="21"
+                    ><span class="top-product-image"
+                        ><AppIcon name="coffee" :size="21"
                     /></span>
                     <div>
                         <h3>{{ product.name }}</h3>
-                        <p>{{ product.category }}</p>
+                        <p>Produk terjual</p>
                     </div>
                     <strong>{{ product.quantity }}<small>item</small></strong>
                 </div>
             </section>
         </div>
         <p class="page-note">
-            <AppIcon name="info" :size="16" />Prototipe tampilan admin. Belum
-            ada koneksi data, perhitungan laporan, atau aksi operasional nyata.
+            <AppIcon name="info" :size="16" />Penjualan mengikuti waktu
+            pembayaran lunas. Peringatan stok selalu menunjukkan kondisi
+            terkini.
         </p>
     </div>
 </template>
 
 <style scoped>
+.dashboard-filter {
+    display: grid;
+    gap: 12px;
+    max-width: 100%;
+}
+.custom-dates {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.custom-dates label {
+    display: grid;
+    gap: 6px;
+    flex: 1;
+    min-width: 140px;
+}
+.custom-dates label > span {
+    color: #7c8272;
+    font-size: 11px;
+}
+.custom-dates input,
+.filter-apply {
+    min-height: 44px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: white;
+    font: inherit;
+    font-size: 12px;
+}
+.filter-apply {
+    margin-top: 20px;
+    background: var(--primary);
+    color: white;
+}
+.filter-apply:disabled {
+    opacity: 0.6;
+}
+.filter-error {
+    max-width: 220px;
+    color: #b42318;
+    font-size: 11px;
+}
+.report-comparison {
+    margin: -12px 0 20px;
+    color: #7c8272;
+    font-size: 12px;
+    line-height: 1.7;
+}
+.sales-chart-scroll {
+    overflow-x: auto;
+}
 .dashboard-period {
     display: grid;
     gap: 6px;
@@ -494,7 +710,7 @@ const lowStock = [
     flex-shrink: 0;
     flex-direction: column;
     justify-content: space-between;
-    padding-bottom: 28px;
+    padding-bottom: 48px;
     color: #8b9180;
     font-size: 10px;
 }
@@ -505,7 +721,7 @@ const lowStock = [
 }
 .chart-grid {
     position: absolute;
-    inset: 0 0 28px;
+    inset: 0 0 48px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -532,7 +748,7 @@ const lowStock = [
 .chart-bar-slot {
     display: flex;
     align-items: flex-end;
-    height: calc(100% - 28px);
+    height: calc(100% - 48px);
 }
 .chart-bar {
     display: block;
@@ -623,6 +839,11 @@ const lowStock = [
     font-weight: 400;
     letter-spacing: 0;
 }
+.business-stat .business-comparison {
+    display: block;
+    margin: 6px 0 0;
+    font-size: 10px;
+}
 .business-stat > svg {
     position: absolute;
     right: 14px;
@@ -709,6 +930,12 @@ const lowStock = [
     margin-top: 12px !important;
     color: #89917e;
     font-size: 11px;
+}
+.empty-state {
+    padding: 26px 0;
+    color: #89917e;
+    font-size: 12px;
+    text-align: center;
 }
 .top-products-panel .dashboard-panel-heading {
     margin-bottom: 9px;

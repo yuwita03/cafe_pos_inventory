@@ -103,7 +103,7 @@ Customer tidak memakai sidebar staff. Header berisi nama café dan label meja. F
 | Cashier  | POS, transaksi terkait, akun/logout                                                     |
 | Kitchen  | Antrean kitchen, akun/logout                                                            |
 | Customer | Menu meja, keranjang, pembayaran, status order miliknya                                 |
-|          |                                                                                             |
+|          |                                                                                         |
 
 Owner adalah role data resmi; `/admin` hanya nama area antarmuka, bukan role tambahan. Menu disembunyikan sesuai akses, dan Laravel tetap menolak request tanpa izin.
 
