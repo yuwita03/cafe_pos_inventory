@@ -1,23 +1,26 @@
 # TASKS — Café POS V1 (Human Tracker)
 
 > **Ini tracker hasil fitur, bukan instruksi coding per file.**  
-> Status: **Todo → Doing → Done**. Semua masih **Todo** sampai diverifikasi di repository.  
-> **Fokus sekarang:** `01 — Project Foundation`. Kerjakan **satu tahap aktif** pada satu waktu.
+> Status: **Todo → Doing → Awaiting Approval → Done**.
+>
+> **Konfirmasi pengguna:** seluruh pekerjaan yang sudah diimplementasikan telah diuji dan disetujui; integrasi payment gateway/QRIS ditunda untuk dikerjakan nanti.
+>
+> **Fokus sekarang:** tidak ada implementasi aktif; sisa tahap 08 dan finalisasi tahap 10 menunggu integrasi payment gateway.
 
 ## 1. Progress
 
 | No. | ID      | Tahap / hasil yang diharapkan                   | Status |
 | --- | ------- | ----------------------------------------------- | ------ |
-| 01  | F00     | Laravel + Vue/Inertia + PostgreSQL berjalan     | Todo   |
-| 02  | F02     | Menu kopi/pastry + variants/options berfungsi   | Todo   |
-| 03  | F03     | Ingredient inventory + coffee recipes berfungsi | Todo   |
-| 04  | FAUTH   | Login/logout dasar untuk staff                  | Todo   |
-| 05  | F07     | Supplier, purchasing, receiving sederhana       | Doing  |
-| 06  | F04     | Cashier POS cash dine-in/takeaway               | Todo   |
-| 07  | F06     | Kitchen queue + potong stok sekali              | Todo   |
+| 01  | F00     | Laravel + Vue/Inertia + PostgreSQL berjalan     | Done   |
+| 02  | F02     | Menu kopi/pastry + variants/options berfungsi   | Done   |
+| 03  | F03     | Ingredient inventory + coffee recipes berfungsi | Done   |
+| 04  | FAUTH   | Login/logout dasar untuk staff                  | Done   |
+| 05  | F07     | Supplier, purchasing, receiving sederhana       | Done   |
+| 06  | F04     | Cashier POS cash dine-in/takeaway               | Done   |
+| 07  | F06     | Kitchen queue + potong stok sekali              | Done   |
 | 08  | F05     | Table QR + QRIS verified (+ QRIS cashier)       | Doing  |
-| 09  | F01     | Employees + fixed roles authorization           | Awaiting Approval |
-| 10  | F09/F10 | Dashboard, testing & release hardening          | Todo   |
+| 09  | F01     | Employees + fixed roles authorization           | Done   |
+| 10  | F09/F10 | Dashboard, testing & release hardening          | Doing  |
 |     |         |                                                 |        |
 |     |         |                                                 |        |
 
@@ -64,7 +67,9 @@
 
 ## 05 — Suppliers & Purchasing
 
-**Status: Doing — implementasi selesai, pemeriksaan UI manual menunggu.** Supplier, form/list/detail draft pembelian, pembatalan, owner-only access, dan receiving atomik terhubung ke backend. Migration purchasing sudah diterapkan pada database lokal; draft tidak mengubah stok dan receiving berulang tidak menggandakan saldo/movement.
+**Status: Done — implementasi dan pengujian dikonfirmasi pengguna.** Supplier, form/list/detail draft pembelian, pembatalan, owner-only access, dan receiving atomik terhubung ke backend. Migration purchasing sudah diterapkan pada database lokal; draft tidak mengubah stok dan receiving berulang tidak menggandakan saldo/movement.
+
+**Riwayat verifikasi:** catatan berikut merekam hasil dan keterbatasan sesi sebelumnya; status menunggu UI/persetujuan di riwayat sudah digantikan oleh konfirmasi pengguna di atas.
 
 **Verifikasi (2026-10-19):** `php artisan test --compact tests/Feature/PurchasingTest.php tests/Feature/InventoryManagementTest.php tests/Feature/AuthenticationTest.php` lulus **74 tests / 764 assertions**, termasuk rollback multi-item, supplier/item nonaktif, terminal states, otorisasi, dan dua proses receiving yang benar-benar menunggu lock PostgreSQL. `composer types:check -- --memory-limit=512M`, `npm.cmd run types:check`, `npm.cmd run build`, pemeriksaan frontend terarah dengan `vp.cmd check`, `php vendor/bin/pint --dirty --format agent`, serta `git diff --check` lulus. Independent review kode stok/otorisasi dan concurrency test: tidak ada temuan blocking.
 
@@ -82,9 +87,9 @@
 
 **Kontak default (2026-10-19):** form supplier dimulai dengan dua input tetap Telepon dan Email. Dropdown pada +Tambah kontak menawarkan Telepon/Email; input tambahan baru muncul setelah jenis dipilih, dengan tombol Hapus. Dropdown jenis tidak lagi ditampilkan pada setiap baris. Saat edit, kontak yang tersimpan mengisi input sesuai jenisnya. Kedua input default tetap opsional. Frontend check, TypeScript, build, dan diff check lulus; status Doing, UI manual belum tersedia.
 
-- [ ] Bisa mengelola supplier serta mencatat draft pembelian dan item/biayanya.
-- [ ] Owner bisa menerima **seluruh** pembelian sehingga stok bertambah; draft tidak mengubah stok.
-- [ ] Receiving kedua kali tidak menambah stok; penerima dan riwayat tercatat.
+- [x] Bisa mengelola supplier serta mencatat draft pembelian dan item/biayanya.
+- [x] Owner bisa menerima **seluruh** pembelian sehingga stok bertambah; draft tidak mengubah stok.
+- [x] Receiving kedua kali tidak menambah stok; penerima dan riwayat tercatat.
 
 **Done jika:** beli 30 croissant dari supplier → receive → stok bertambah 30 pcs **tepat sekali**.
 
@@ -106,13 +111,18 @@
 
 ## 08 — Table QR + QRIS
 
-- [ ] Owner bisa tambah/edit/aktif/nonaktifkan meja dan melihat/unduh SVG/cetak QR berisi `/menu?table={id}`, tanpa token meja; ID dan riwayat order tetap dipertahankan.
-- [ ] UI pelanggan untuk menu dan checkout tanpa login dikerjakan pengguna secara terpisah pada tahap berikutnya. Saat ini tujuan QR hanya teks belum tersedia, tanpa katalog atau UI pelanggan; ID invalid/meja nonaktif ditolak.
+**Status: Doing — hanya integrasi payment gateway/QRIS yang ditunda.** Admin meja/QR, menu dan checkout pelanggan, pembayaran cash melalui konfirmasi kasir, serta status order privat sudah diimplementasikan dan diuji sesuai konfirmasi pengguna. Integrasi gateway dan pengujian provider belum dinyatakan selesai.
+
+- [x] Owner bisa tambah/edit/aktif/nonaktifkan meja dan melihat/unduh SVG/cetak QR berisi `/menu?table={id}`, tanpa token meja; ID dan riwayat order tetap dipertahankan.
+- [x] UI pelanggan untuk menu dan checkout tanpa login tersedia; ID invalid/meja nonaktif ditolak.
+- [x] Status order privat tersedia; guest cash menunggu konfirmasi kasir sebelum masuk kitchen.
 - [ ] QRIS dinamis dibuat melalui provider sandbox/fake lokal; hanya notifikasi **server-verified** mengirim order ke kitchen.
-- [ ] Tangani callback duplikat, gagal, expired, late paid (`payment_review`), dan status order privat.
+- [ ] Tangani callback gateway duplikat, gagal, expired, dan late paid (`payment_review`).
 - [ ] Cashier bisa memilih QRIS memakai mekanisme pembayaran yang sama.
 
 **Done jika:** Table QR → Iced Americano → verified QRIS → satu kitchen order; unpaid tidak tampil. **Live payment belum siap sampai provider asli diuji.**
+
+**Riwayat implementasi:** status Awaiting Approval/Doing dan keterangan fitur belum tersedia di bawah merekam tahap sebelumnya; gunakan status terbaru di atas. Pekerjaan non-gateway telah dikonfirmasi pengguna.
 
 **Irisan admin Meja & QR:** UI admin dan backend terintegrasi; UI pelanggan sudah dihapus sesuai koreksi scope pengguna. Status irisan: **Awaiting Approval**. QA independen setelah koreksi scope: **PASS** (inspeksi statis); review **9/10 — APPROVE**, tanpa temuan penghambat. Verifikasi eksekusi: TableQr 23 test / 202 assertions, PHPStan, Vue types, lint, Pint, dan build lulus. Belum ada pemeriksaan browser/scan/cetak fisik; checklist UI dan tahap QRIS belum dinyatakan selesai. Receipt, akses guest berbasis session, dan history customer tetap di `note`.
 
@@ -136,7 +146,9 @@
 
 ## 09 — Employees & Fixed Roles
 
-**Awaiting Approval:** halaman staf tersambung ke tabel users existing: tambah/edit akun, pencarian/filter/pagination, role tetap, aktif/nonaktif, reset password dan sesi. Gate membatasi seluruh management/POS/kitchen routes; sidebar dan tautan kitchen mengikuti capability server, login menuju area sesuai role. Owner tidak dapat demote/nonaktifkan diri; update mengunci akun berurutan dan memeriksa ulang actor untuk menjaga owner aktif saat request bersamaan. Tidak ada migration/dependency baru. Verifikasi: `php artisan test --compact tests/Feature tests/StaffConcurrencyTest.php` **311 passed / 3373 assertions**, termasuk dua worker PostgreSQL yang benar-benar menunggu row lock untuk demotion/deactivation dan regresi reset password dengan session database. Vue types, PHPStan, lint/format, production build dan diff check lulus. Review independen: masalah self-session reset dan tautan kitchen telah diperbaiki; snapshot statistik polling test juga diperbaiki dan diuji ulang. Browser tidak terhubung, sehingga tampilan desktop/mobile belum diperiksa visual. Suite lengkap `php artisan test --compact` diminta pada handoff; menunggu persetujuan pengguna.
+**Status: Done — implementasi dan pengujian dikonfirmasi pengguna.**
+
+**Riwayat verifikasi sebelum konfirmasi pengguna:** halaman staf tersambung ke tabel users existing: tambah/edit akun, pencarian/filter/pagination, role tetap, aktif/nonaktif, reset password dan sesi. Gate membatasi seluruh management/POS/kitchen routes; sidebar dan tautan kitchen mengikuti capability server, login menuju area sesuai role. Owner tidak dapat demote/nonaktifkan diri; update mengunci akun berurutan dan memeriksa ulang actor untuk menjaga owner aktif saat request bersamaan. Tidak ada migration/dependency baru. Verifikasi: `php artisan test --compact tests/Feature tests/StaffConcurrencyTest.php` **311 passed / 3373 assertions**, termasuk dua worker PostgreSQL yang benar-benar menunggu row lock untuk demotion/deactivation dan regresi reset password dengan session database. Vue types, PHPStan, lint/format, production build dan diff check lulus. Review independen: masalah self-session reset dan tautan kitchen telah diperbaiki; snapshot statistik polling test juga diperbaiki dan diuji ulang. Browser tidak terhubung pada sesi tersebut, sehingga tampilan desktop/mobile belum diperiksa visual oleh agent. Suite lengkap `php artisan test --compact` diminta pada handoff saat itu.
 
 - [x] Owner bisa tambah/nonaktifkan akun pegawai; role `owner/cashier/kitchen` tetap.
 - [x] Policy/Gate/backend membatasi owner management, cashier POS dan kitchen operations.
@@ -146,10 +158,16 @@
 
 ## 10 — Dashboard & Final QA
 
-- [ ] Dashboard penjualan terkonfirmasi, order count, top products, dan low-stock warning.
-- [ ] Uji 4 alur: Cashier → Kitchen; QR → QRIS → Kitchen; Purchase → Stock; Recipe → Consumption.
-- [ ] Uji failure path: no stock, duplicate checkout/webhook, expiry/late pay, double prepare, unauthorized access.
-- [ ] Review konfigurasi keamanan, backup/restore, environment dan integrasi QRIS nyata sebelum rilis.
+**Status: Doing — dashboard dan QA pekerjaan yang sudah diimplementasikan dikonfirmasi selesai oleh pengguna; finalisasi integrasi gateway dan kesiapan rilis menunggu tahap 08.**
+
+**Dashboard calendar filter — Done:** presets and native custom calendars support up to 366 inclusive days, WIB reporting with UTC storage, elapsed-period comparisons, and daily/weekly/monthly chart grouping. Recorded agent verification: dashboard and role-access tests 45 / 831 assertions, PHPStan, Vue types, dashboard lint/format, Pint, production build, and diff check passed. Independent review found a retained chart-selection error after invalid filters; fixed and re-reviewed with no remaining findings. Browser/calendar-click and mobile visual checks were unavailable and the full suite was not run in that agent session; the user subsequently confirmed implemented work was tested and approved.
+
+- [x] Dashboard penjualan terkonfirmasi, order count, top products, dan low-stock warning.
+- [x] Uji alur yang tersedia: Cashier → Kitchen; guest cash → konfirmasi kasir → Kitchen; Purchase → Stock; Recipe → Consumption.
+- [x] Uji failure path yang tersedia: no stock, duplicate checkout, expiry guest cash, double prepare, unauthorized access.
+- [x] Review pekerjaan non-gateway yang sudah diimplementasikan, sesuai konfirmasi pengguna.
+- [ ] Uji QR → QRIS → Kitchen dan webhook duplikat/gagal/expired/late paid setelah integrasi gateway.
+- [ ] Finalisasi review konfigurasi keamanan, backup/restore, environment dan integrasi QRIS nyata sebelum rilis.
 
 **Done jika:** success criteria `PRD.md` terpenuhi, semua critical tests lulus, dan tidak ada management routes publik. Jika provider nyata belum tersedia, **status belum siap production** walaupun local tests lulus.
 
@@ -157,13 +175,17 @@
 
 ## 2. Current work / blocker
 
-| Field             | Isi                                                   |
-| ----------------- | ----------------------------------------------------- |
-| Current stage     | **08 — F05 Table QR + QRIS**                          |
-| Status            | **Doing**                                             |
-| Next outcome      | QRIS provider dan callback terverifikasi masih tersisa |
-| Blocker           | Provider QRIS belum dipilih                       |
-| Last verification | Guest cash + cashier + TableQr: 57 tests / 695 assertions; Vue types dan lint lulus |
+| Field             | Isi                                                                                                                                           |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Current stage     | **08 — F05: sisa integrasi payment gateway/QRIS**                                                                                             |
+| Status            | **Doing — ditunda sesuai keputusan pengguna**                                                                                                 |
+| Next outcome      | Implementasi provider QRIS dan callback terverifikasi saat pekerjaan dilanjutkan                                                              |
+| Blocker           | Tidak ada blocker pada pekerjaan selesai; integrasi gateway sengaja ditunda                                                                   |
+| Last verification | Pengguna mengonfirmasi seluruh pekerjaan yang sudah diimplementasikan telah diuji; bukti hasil agent sebelumnya dipertahankan di setiap tahap |
+
+**Status terbaru:** tahap 01–07 dan 09 Done. Dashboard dan kalender Done. Tahap 08 serta finalisasi rilis tahap 10 tetap terbuka untuk gateway dan verifikasi integrasinya. Tidak ada test baru dijalankan untuk pembaruan tracker ini.
+
+**Riwayat checkpoint:** catatan Awaiting Approval/Awaiting UI Approval/Doing di bawah adalah riwayat sesi sebelumnya dan telah digantikan oleh konfirmasi pengguna untuk pekerjaan non-gateway; bukan pekerjaan aktif yang masih menunggu persetujuan.
 
 **Pemisahan UI pemesan — Awaiting Approval:** Pesanan tetap di CustomerMenuCart.vue; formulir Data pemesan dipindahkan ke CustomerDetailsForm.vue. Navigasi, fokus, field wajib/opsional dan placeholder dipertahankan. Vue types sebelum/sesudah, lint/format kedua komponen, build dan diff check lulus; browser belum diperiksa. F05 tetap Doing.
 

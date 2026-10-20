@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\CashOrderController;
 use App\Http\Controllers\Admin\CategoryController;
+use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\OptionGroupController;
@@ -33,7 +34,7 @@ if (app()->environment('local', 'testing')) {
     Route::middleware(['auth', EnsureUserIsActive::class, 'auth.session'])->group(function (): void {
         Route::post('/logout', [SessionController::class, 'destroy'])->name('logout');
         Route::middleware('can:manage-workspace')->group(function (): void {
-            Route::inertia('/admin/dashboard', 'admin/Dashboard')->name('admin.dashboard');
+            Route::get('/admin/dashboard', DashboardController::class)->name('admin.dashboard');
             Route::get('/admin/inventory', [InventoryController::class, 'index'])->defaults('section', 'stock')->name('admin.inventory.index');
             Route::get('/admin/inventory/recipes', [InventoryController::class, 'index'])->defaults('section', 'recipes')->name('admin.inventory.recipes');
             Route::get('/admin/inventory/history', [InventoryController::class, 'index'])->defaults('section', 'history')->name('admin.inventory.history');
