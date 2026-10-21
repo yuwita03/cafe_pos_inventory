@@ -14,7 +14,7 @@ final class MidtransQris
     {
         return (bool) config('services.midtrans.enabled')
             && config('services.midtrans.environment') === 'sandbox'
-            && str_starts_with((string) config('services.midtrans.sandbox_server_key'), 'SB-Mid-server-');
+            && preg_match('/^(?:SB-)?Mid-server-\S+$/D', (string) config('services.midtrans.sandbox_server_key')) === 1;
     }
 
     public function create(Order $order): void

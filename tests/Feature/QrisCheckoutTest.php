@@ -45,8 +45,9 @@ function qrisChargeResponse(Request $request): array
     ];
 }
 
-test('sandbox qris checkout persists a pending order and hold before creating one payment qr', function (): void {
+test('sandbox qris checkout persists a pending order and hold before creating one payment qr', function (string $serverKey): void {
     $this->freezeTime();
+    config(['services.midtrans.sandbox_server_key' => $serverKey]);
     $fixture = qrisCheckoutFixture();
     $transactionLevel = DB::transactionLevel();
     Http::fake(function (Request $request) use ($transactionLevel) {
@@ -57,6 +58,7 @@ test('sandbox qris checkout persists a pending order and hold before creating on
         return Http::response(qrisChargeResponse($request), 201);
     });
 
+    $this->get(route('admin.pos'))->assertInertia(fn (Assert $page) => $page->where('qrisAvailable', true));
     $response = $this->postJson(route('admin.pos.checkout'), $fixture['payload'])->assertOk()
         ->assertJsonPath('order.status', 'awaiting_payment')->assertJsonPath('order.paymentStatus', 'pending')
         ->assertJsonPath('order.method', 'qris')->assertJsonPath('order.qris.state', 'ready')
@@ -69,11 +71,14 @@ test('sandbox qris checkout persists a pending order and hold before creating on
     $this->assertDatabaseCount('stock_movements', 0);
     Http::assertSentCount(1);
     Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.sandbox.midtrans.com/v2/charge'
-        && $request->hasHeader('Authorization', 'Basic '.base64_encode('SB-Mid-server-test-secret:'))
+        && $request->hasHeader('Authorization', 'Basic '.base64_encode($serverKey.':'))
         && $request['payment_type'] === 'qris' && $request['transaction_details']['gross_amount'] === 25000
         && $request['custom_expiry']['expiry_duration'] === 15);
-    expect($response->getContent())->not->toContain('SB-Mid-server-test-secret');
-});
+    expect($response->getContent())->not->toContain($serverKey);
+})->with([
+    'SB-prefixed sandbox server key' => 'SB-Mid-server-test-secret',
+    'unprefixed sandbox server key' => 'Mid-server-test-secret',
+]);
 
 test('qris retries recover the original attempt without another charge or a reset deadline', function (): void {
     $this->freezeTime();
@@ -189,7 +194,10 @@ test('sandbox qris is unavailable without an enabled sandbox configuration', fun
     'disabled' => ['services.midtrans.enabled', false],
     'production environment' => ['services.midtrans.environment', 'production'],
     'no sandbox key' => ['services.midtrans.sandbox_server_key', ''],
-    'live key in sandbox setting' => ['services.midtrans.sandbox_server_key', 'Mid-server-live-key'],
+    'client key is not a server key' => ['services.midtrans.sandbox_server_key', 'Mid-client-test-key'],
+    'prefixed client key is not a server key' => ['services.midtrans.sandbox_server_key', 'SB-Mid-client-test-key'],
+    'server prefix without a secret' => ['services.midtrans.sandbox_server_key', 'Mid-server-'],
+    'whitespace is not a key' => ['services.midtrans.sandbox_server_key', '   '],
 ]);
 
 test('untrusted or unsuccessful charge responses remain unresolved without exposing a qr', function (string $field, mixed $value): void {
