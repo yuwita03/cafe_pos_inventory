@@ -2,6 +2,12 @@
 
 return [
 
+    'midtrans' => [
+        'enabled' => env('MIDTRANS_QRIS_ENABLED', false),
+        'environment' => env('MIDTRANS_ENVIRONMENT', 'sandbox'),
+        'sandbox_server_key' => env('MIDTRANS_SANDBOX_SERVER_KEY'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services

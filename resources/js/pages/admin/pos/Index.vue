@@ -13,6 +13,7 @@ import '../../../../css/pos.css';
 import AppIcon from '@/components/AppIcon.vue';
 import PosCart from '@/components/admin/PosCart.vue';
 import PosProductDialog from '@/components/admin/PosProductDialog.vue';
+import QrisPaymentDialog from '@/components/admin/QrisPaymentDialog.vue';
 import AppDialog from '@/components/ui/AppDialog.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import AdminLayout from '@/layouts/AdminLayout.vue';
@@ -31,6 +32,7 @@ const props = defineProps<{
         groups: PosGroup[];
     };
     tables: { id: number; label: string }[];
+    qrisAvailable: boolean;
 }>();
 const products = computed(() => props.catalog.products);
 const categories = computed(() => props.catalog.categories);
@@ -56,13 +58,16 @@ const processing = ref(false);
 const paymentError = ref('');
 const receipt = ref<OrderData | null>(null);
 const receiptOpen = ref(false);
+const qrisOpen = ref(false);
+const paymentMethod = ref<'cash' | 'qris'>('cash');
 type CheckoutPayload = {
     checkout_key: string;
     customer_name: string;
     fulfillment_type: 'dine_in' | 'takeaway';
     table_id: number | null;
     expected_total_idr: number;
-    cash_received_idr: number;
+    payment_method?: 'cash' | 'qris';
+    cash_received_idr?: number;
     items: { variant_id: number; option_ids: number[]; quantity: number }[];
 };
 const pendingCheckout = ref<CheckoutPayload | null>(null);
@@ -256,8 +261,14 @@ async function closePayment(): Promise<void> {
     }
     returnToCart = false;
 }
-async function confirmCash(): Promise<void> {
-    if (processing.value || (!pendingCheckout.value && !cashValid.value)) {
+async function confirmPayment(): Promise<void> {
+    if (
+        processing.value ||
+        (!pendingCheckout.value &&
+            (paymentMethod.value === 'cash'
+                ? !cashValid.value
+                : !props.qrisAvailable))
+    ) {
         return;
     }
     pendingCheckout.value ??= {
@@ -267,7 +278,10 @@ async function confirmCash(): Promise<void> {
         table_id:
             fulfillment.value === 'dine_in' ? Number(tableId.value) : null,
         expected_total_idr: total.value,
-        cash_received_idr: cashValue.value,
+        payment_method: paymentMethod.value,
+        ...(paymentMethod.value === 'cash'
+            ? { cash_received_idr: cashValue.value }
+            : {}),
         items: cart.value.map((line) => ({
             variant_id: line.variantId,
             option_ids: [...line.optionIds],
@@ -285,7 +299,7 @@ async function confirmCash(): Promise<void> {
     } catch {
         pendingCheckout.value = null;
         paymentError.value =
-            'Browser tidak dapat menyimpan pemulihan checkout. Aktifkan penyimpanan sesi sebelum mengonfirmasi tunai.';
+            'Browser tidak dapat menyimpan pemulihan checkout. Aktifkan penyimpanan sesi sebelum melanjutkan pembayaran.';
         return;
     }
     processing.value = true;
@@ -342,7 +356,8 @@ async function confirmCash(): Promise<void> {
         tableId.value = '';
         fulfillment.value = 'dine_in';
         await nextTick();
-        receiptOpen.value = true;
+        receiptOpen.value = data.order.method === 'cash';
+        qrisOpen.value = data.order.method === 'qris';
     } catch {
         paymentError.value =
             'Hasil pembayaran belum dapat dipastikan. Coba ulang dengan data yang sama, atau periksa Pesanan sebelum membuat transaksi baru.';
@@ -354,6 +369,7 @@ function viewOrder(): void {
     viewingOrder = true;
     paymentOpen.value = false;
     receiptOpen.value = false;
+    qrisOpen.value = false;
     router.visit(
         orders(
             receipt.value
@@ -376,6 +392,7 @@ function resetDraft(): void {
     clearOpen.value = false;
     receiptOpen.value = false;
     receipt.value = null;
+    qrisOpen.value = false;
     pendingCheckout.value = null;
     notice.value = 'Draf baru siap dibuat.';
 }
@@ -423,7 +440,8 @@ onMounted(() => {
                     recovery.payload.table_id === null
                         ? ''
                         : String(recovery.payload.table_id);
-                cashReceived.value = recovery.payload.cash_received_idr;
+                cashReceived.value = recovery.payload.cash_received_idr ?? '';
+                paymentMethod.value = recovery.payload.payment_method ?? 'cash';
                 paymentOpen.value = true;
                 paymentError.value =
                     'Ada checkout yang belum dipastikan. Coba ulang untuk mengambil hasil pesanan yang sama sebelum membuat transaksi baru.';
@@ -471,12 +489,16 @@ onBeforeUnmount(() => {
                 <h1>Kasir POS<span class="title-dot">.</span></h1>
                 <p>Pilih menu, atur pesanan, lalu lanjutkan ke pembayaran.</p>
             </div>
-            <span class="pos-prototype-badge"><span />Pembayaran tunai</span>
+            <span class="pos-prototype-badge"
+                ><span />{{
+                    qrisAvailable ? 'Tunai · QRIS sandbox' : 'Pembayaran tunai'
+                }}</span
+            >
         </div>
         <div class="pos-prototype-banner">
             <AppIcon name="info" :size="19" />
             <p>
-                <strong>Kasir tunai</strong> Pembayaran tersimpan di database.
+                <strong>Kasir POS</strong> Pembayaran tersimpan di database.
                 Stok direservasi saat checkout dan dipotong sekali ketika
                 Kitchen mulai membuat.
             </p>
@@ -697,7 +719,7 @@ onBeforeUnmount(() => {
 
         <AppDialog
             :open="paymentOpen"
-            title="Pembayaran tunai"
+            title="Pilih pembayaran"
             class="pos-payment-dialog"
             @close="closePayment"
         >
@@ -714,69 +736,87 @@ onBeforeUnmount(() => {
                         }}
                     </p>
                 </div>
-                <p class="pos-demo-note">
+                <p v-if="paymentMethod === 'cash'" class="pos-demo-note">
                     <AppIcon name="info" :size="16" />Konfirmasi setelah uang
                     tunai diterima. Sistem akan memvalidasi harga dan stok
                     sebelum menyimpan pesanan.
                 </p>
                 <fieldset class="pos-service pos-payment-method">
                     <legend>Metode pembayaran</legend>
-                    <label class="selected"
+                    <label :class="{ selected: paymentMethod === 'cash' }"
                         ><input
                             type="radio"
                             name="pos-payment"
                             value="cash"
-                            checked
+                            v-model="paymentMethod"
+                            :disabled="processing || Boolean(pendingCheckout)"
                         />Tunai</label
-                    ><label
+                    ><label :class="{ selected: paymentMethod === 'qris' }"
                         ><input
                             type="radio"
                             name="pos-payment"
                             value="qris"
-                            disabled
-                        />QRIS · belum tersedia</label
+                            v-model="paymentMethod"
+                            :disabled="
+                                processing ||
+                                Boolean(pendingCheckout) ||
+                                !qrisAvailable
+                            "
+                        />{{
+                            qrisAvailable
+                                ? 'QRIS · sandbox'
+                                : 'QRIS · belum dikonfigurasi'
+                        }}</label
                     >
                 </fieldset>
-                <label class="field pos-cash-input" for="pos-cash"
-                    >Uang diterima<input
-                        id="pos-cash"
-                        v-model.number="cashReceived"
-                        type="number"
-                        min="0"
-                        step="1"
-                        inputmode="numeric"
-                        placeholder="Masukkan nominal rupiah"
-                        :readonly="processing || Boolean(pendingCheckout)"
-                        aria-describedby="pos-cash-help"
-                /></label>
-                <div class="pos-quick-amounts">
-                    <button
-                        v-for="amount in quickAmounts"
-                        :key="amount"
-                        type="button"
-                        :disabled="processing || Boolean(pendingCheckout)"
-                        @click="cashReceived = amount"
-                    >
-                        {{ amount === total ? 'Uang pas' : rupiah(amount) }}
-                    </button>
-                </div>
-                <p
-                    id="pos-cash-help"
-                    class="pos-field-help"
-                    :class="{ 'pos-error': cashReceived !== '' && !cashValid }"
-                >
-                    {{
-                        cashReceived !== '' && !cashValid
-                            ? 'Nominal harus berupa rupiah bulat dan mencukupi total pesanan.'
-                            : 'Harga akhir ditentukan oleh server saat konfirmasi.'
-                    }}
+                <p v-if="paymentMethod === 'qris'" class="pos-demo-note">
+                    QRIS sandbox untuk uji coba. Pesanan belum dibayar dan stok
+                    tetap direservasi. Konfirmasi dan pembatalan belum tersedia.
                 </p>
-                <div class="pos-change">
-                    <span>Kembalian</span
-                    ><strong>{{
-                        rupiah(Math.max(0, cashValue - total))
-                    }}</strong>
-                </div>
+                <template v-if="paymentMethod === 'cash'">
+                    <label class="field pos-cash-input" for="pos-cash"
+                        >Uang diterima<input
+                            id="pos-cash"
+                            v-model.number="cashReceived"
+                            type="number"
+                            min="0"
+                            step="1"
+                            inputmode="numeric"
+                            placeholder="Masukkan nominal rupiah"
+                            :readonly="processing || Boolean(pendingCheckout)"
+                            aria-describedby="pos-cash-help"
+                    /></label>
+                    <div class="pos-quick-amounts">
+                        <button
+                            v-for="amount in quickAmounts"
+                            :key="amount"
+                            type="button"
+                            :disabled="processing || Boolean(pendingCheckout)"
+                            @click="cashReceived = amount"
+                        >
+                            {{ amount === total ? 'Uang pas' : rupiah(amount) }}
+                        </button>
+                    </div>
+                    <p
+                        id="pos-cash-help"
+                        class="pos-field-help"
+                        :class="{
+                            'pos-error': cashReceived !== '' && !cashValid,
+                        }"
+                    >
+                        {{
+                            cashReceived !== '' && !cashValid
+                                ? 'Nominal harus berupa rupiah bulat dan mencukupi total pesanan.'
+                                : 'Harga akhir ditentukan oleh server saat konfirmasi.'
+                        }}
+                    </p>
+                    <div class="pos-change">
+                        <span>Kembalian</span
+                        ><strong>{{
+                            rupiah(Math.max(0, cashValue - total))
+                        }}</strong>
+                    </div>
+                </template>
                 <p v-if="paymentError" class="pos-error" role="alert">
                     {{ paymentError }}
                 </p>
@@ -792,19 +832,35 @@ onBeforeUnmount(() => {
                     >Periksa Pesanan</BaseButton
                 ><BaseButton
                     variant="primary"
-                    :disabled="processing || (!pendingCheckout && !cashValid)"
+                    :disabled="
+                        processing ||
+                        (!pendingCheckout &&
+                            (paymentMethod === 'cash'
+                                ? !cashValid
+                                : !qrisAvailable))
+                    "
                     :aria-busy="processing"
-                    @click="confirmCash"
+                    @click="confirmPayment"
                     >{{
                         processing
-                            ? 'Menyimpan pembayaran…'
+                            ? paymentMethod === 'qris'
+                                ? 'Membuat QR…'
+                                : 'Menyimpan pembayaran…'
                             : pendingCheckout
                               ? 'Coba ulang checkout'
-                              : 'Konfirmasi tunai'
+                              : paymentMethod === 'qris'
+                                ? 'Buat QRIS sandbox'
+                                : 'Konfirmasi tunai'
                     }}</BaseButton
                 ></template
             >
         </AppDialog>
+        <QrisPaymentDialog
+            :open="qrisOpen"
+            :order="receipt"
+            @close="qrisOpen = false"
+            @view-order="viewOrder"
+        />
         <AppDialog
             :open="receiptOpen"
             title="Pembayaran berhasil"

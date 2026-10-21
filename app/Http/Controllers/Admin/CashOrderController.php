@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AdvanceKitchenOrderRequest;
 use App\Http\Requests\Admin\CashCheckoutRequest;
 use App\InventoryStock;
+use App\MidtransQris;
 use App\Models\CafeTable;
 use App\Models\Category;
 use App\Models\Option;
@@ -32,6 +33,7 @@ class CashOrderController extends Controller
         $reservedQuantities = $inventory->reservedQuantities();
 
         return Inertia::render('admin/pos/Index', [
+            'qrisAvailable' => app(MidtransQris::class)->available(),
             'catalog' => [
                 'categories' => Category::where('is_active', true)->orderBy('name')->get()->map(fn (Category $category): array => ['id' => $category->id, 'name' => $category->name, 'active' => true]),
                 'groups' => OptionGroup::with('options')->where('is_active', true)->get()->map(fn (OptionGroup $group): array => [
@@ -58,6 +60,10 @@ class CashOrderController extends Controller
                 throw ValidationException::withMessages(['checkout_key' => 'Kunci checkout sudah digunakan. Periksa daftar pesanan sebelum mencoba lagi.']);
             }
             throw $exception;
+        }
+
+        if ($request->validated('payment_method') === 'qris') {
+            app(MidtransQris::class)->create($order);
         }
 
         return response()->json(['order' => $cash->present(collect([$order]))[0]]);

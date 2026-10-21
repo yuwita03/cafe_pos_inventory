@@ -35,5 +35,11 @@ export interface OrderData {
     createdAt: string;
     paidAt: string | null;
     expiresAt: string | null;
+    qris?: {
+        state: 'ready' | 'checking';
+        qrUrl: string | null;
+        expiresAt: string | null;
+        serverTime: string;
+    } | null;
     lines: CartLine[];
 }
