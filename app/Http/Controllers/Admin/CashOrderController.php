@@ -75,9 +75,6 @@ class CashOrderController extends Controller
             'order' => ['nullable', 'string', 'regex:/^ORD-\d{1,20}$/'],
         ]);
         $scope = Order::query();
-        if ($request->user()->role === 'cashier') {
-            $scope->where(fn ($query) => $query->where('created_by_user_id', $request->user()->id)->orWhere('source', 'table_qr'));
-        }
         $selected = isset($data['order']) ? (clone $scope)->findOrFail((int) substr($data['order'], 4)) : null;
         $filters = ['q' => trim($data['q'] ?? ''), 'status' => $data['status'] ?? '', 'payment_status' => $data['payment_status'] ?? '', 'source' => $data['source'] ?? ''];
         $query = clone $scope;

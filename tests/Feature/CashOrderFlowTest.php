@@ -281,42 +281,45 @@ test('orders and kitchen read persisted transactions without mock rows across re
     }
 });
 
-test('cashiers can checkout and read only their own orders but cannot operate kitchen', function (): void {
+test('cashiers can checkout and read shared orders but cannot operate kitchen', function (): void {
     $fixture = cashOrderFixture();
-    $foreignNumber = $this->postJson(route('admin.pos.checkout'), $fixture['payload'])->assertOk()->json('order.number');
+    $creator = User::factory()->create(['role' => 'cashier']);
+    $foreignOrder = $this->actingAs($creator)->postJson(route('admin.pos.checkout'), $fixture['payload'])->assertOk()->json('order');
     $cashier = User::factory()->create(['role' => 'cashier']);
     $payload = [...$fixture['payload'], 'checkout_key' => (string) Str::uuid()];
     $orderId = $this->actingAs($cashier)->postJson(route('admin.pos.checkout'), $payload)->assertOk()->json('order.id');
 
-    $this->get(route('admin.orders'))->assertOk()->assertInertia(fn (Assert $page) => $page->has('orders', 1)->where('orders.0.id', $orderId));
-    $this->get(route('admin.orders', ['order' => $foreignNumber]))->assertNotFound();
+    $this->get(route('admin.orders'))->assertOk()->assertInertia(fn (Assert $page) => $page->has('orders', 2)->where('summary.total', 2)->where('pagination.total', 2));
+    $this->get(route('admin.orders', ['order' => $foreignOrder['number']]))->assertOk()->assertInertia(fn (Assert $page) => $page->where('selectedOrder.id', $foreignOrder['id']));
     $this->get(route('admin.orders', ['order' => 'ORD-'.str_pad((string) $orderId, 6, '0', STR_PAD_LEFT)]))->assertOk()->assertInertia(fn (Assert $page) => $page->where('selectedOrder.id', $orderId));
     $this->postJson(route('admin.kitchen.advance', $orderId), ['expected_status' => 'queued'])->assertForbidden();
 
     $this->assertDatabaseHas('orders', ['id' => $orderId, 'status' => 'queued', 'created_by_user_id' => $cashier->id]);
+    $this->assertDatabaseHas('orders', ['id' => $foreignOrder['id'], 'status' => 'queued', 'created_by_user_id' => $creator->id]);
     $this->assertDatabaseCount('stock_movements', 0);
 });
 
-test('orders search and independent filters limit summary and paginate persisted records', function (): void {
-    $ownerId = auth()->id();
-    $target = Order::factory()->create(['created_by_user_id' => $ownerId, 'customer_name' => 'Needle customer', 'status' => 'completed']);
-    $pending = Order::factory()->create(['created_by_user_id' => $ownerId, 'customer_name' => 'Needle unpaid', 'status' => 'completed']);
-    $queued = Order::factory()->create(['created_by_user_id' => $ownerId, 'customer_name' => 'Needle queued', 'status' => 'queued']);
+test('orders search and independent filters limit shared summaries and pagination', function (string $role): void {
+    $creator = User::factory()->create(['role' => 'cashier']);
+    $target = Order::factory()->create(['created_by_user_id' => $creator->id, 'customer_name' => 'Needle customer', 'status' => 'completed']);
+    $pending = Order::factory()->create(['created_by_user_id' => $creator->id, 'customer_name' => 'Needle unpaid', 'status' => 'completed']);
+    $queued = Order::factory()->create(['created_by_user_id' => $creator->id, 'customer_name' => 'Needle queued', 'status' => 'queued']);
     $qr = Order::factory()->create(['created_by_user_id' => null, 'customer_name' => 'Needle QR', 'status' => 'completed', 'source' => 'table_qr', 'fulfillment_type' => 'dine_in', 'table_id' => CafeTable::factory()->create()->id]);
-    Order::factory()->count(26)->create(['created_by_user_id' => $ownerId, 'customer_name' => 'Other customer']);
+    Order::factory()->count(26)->create(['created_by_user_id' => $creator->id, 'customer_name' => 'Other customer']);
     foreach ([$target, $pending, $queued, $qr] as $order) {
         DB::table('payments')->insert(['order_id' => $order->id, 'method' => 'cash', 'amount_idr' => 25000, 'status' => $order->id === $pending->id ? 'pending' : 'paid', 'cash_received_idr' => 25000, 'change_idr' => 0, 'paid_at' => $order->id === $pending->id ? null : now(), 'created_at' => now()]);
     }
     $filters = ['q' => 'needle', 'status' => 'completed', 'payment_status' => 'paid', 'source' => 'cashier'];
+    $this->actingAs(User::factory()->create(['role' => $role]));
 
     $this->get(route('admin.orders', $filters))->assertOk()->assertInertia(fn (Assert $page) => $page
         ->has('orders', 1)->where('orders.0.id', $target->id)->where('filters', $filters)
         ->where('summary.total', 1)->where('summary.pending', 0)->where('pagination.total', 1));
     $number = 'ORD-'.str_pad((string) $target->id, 6, '0', STR_PAD_LEFT);
     $this->get(route('admin.orders', ['q' => $number]))->assertOk()->assertInertia(fn (Assert $page) => $page->has('orders', 1)->where('orders.0.id', $target->id));
-    $this->get(route('admin.orders'))->assertOk()->assertInertia(fn (Assert $page) => $page->has('orders', 25)->where('pagination.total', 30)->where('pagination.current_page', 1)->where('pagination.last_page', 2));
+    $this->get(route('admin.orders'))->assertOk()->assertInertia(fn (Assert $page) => $page->has('orders', 25)->where('summary.total', 30)->where('summary.pending', 1)->where('pagination.total', 30)->where('pagination.current_page', 1)->where('pagination.last_page', 2));
     $this->get(route('admin.orders', ['page' => 2]))->assertOk()->assertInertia(fn (Assert $page) => $page->has('orders', 5)->where('pagination.current_page', 2)->where('pagination.from', 26)->where('pagination.to', 30));
-});
+})->with(['owner', 'cashier']);
 
 test('kitchen staff cannot create cash sales', function (): void {
     $fixture = cashOrderFixture();
