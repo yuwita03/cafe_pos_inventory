@@ -59,7 +59,8 @@ const renderer = createRenderer({
         target.children = [];
     },
     patchProp: (target, key, _, value) => {
-        target.props[key] = value;
+        target.props[key] =
+            key === 'disabled' ? value === '' || Boolean(value) : value;
     },
     parentNode: (target) => target.parent,
     nextSibling: (target) =>
@@ -96,7 +97,7 @@ function text(root) {
     return root.text + root.children.map(text).join('');
 }
 
-test('QR display preserves its countdown across closing, hides expired QR, and emits navigation without payment actions', async (t) => {
+test('QR display preserves its countdown across closing, hides expired QR, disables payment controls, and emits close and view-order events', async (t) => {
     let elapsed = 0;
     let tick;
     t.mock.method(performance, 'now', () => elapsed);
@@ -152,10 +153,17 @@ test('QR display preserves its countdown across closing, hides expired QR, and e
         props.open = true;
         await nextTick();
         assert.equal(text(all(root, 'time')[0]), '13:00');
-        const unavailable = all(root, 'button').filter(
-            (button) => button.props.disabled !== undefined,
-        );
-        assert.equal(unavailable.length, 2);
+        for (const label of ['Periksa status', 'Batalkan pembayaran']) {
+            const button = all(root, 'button').find(
+                (candidate) => text(candidate) === label,
+            );
+            assert.ok(button, `Missing payment button: ${label}`);
+            assert.equal(
+                button.props.disabled,
+                true,
+                `${label} must be disabled`,
+            );
+        }
         all(root, 'button')
             .find((button) => text(button) === 'Tutup tampilan')
             .props.onClick();

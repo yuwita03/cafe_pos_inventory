@@ -27,6 +27,7 @@
 - Focused QRIS feature tests: 22 passed / 222 assertions. Checkout/guest-cash regressions were also exercised.
 - Full PostgreSQL suite: `php artisan test --compact` — 362 passed / 4183 assertions.
 - Component runtime: `node --test tests/QrisPaymentDialogTest.mjs` — 1 passed, covering deadline continuity, QR hiding at zero, unavailable actions, and close/navigation events.
+- Follow-up review: both named payment buttons must have `disabled === true` using DOM boolean-attribute semantics. The test name claims rendered states and emitted events, not the absence of network requests. Component test and targeted lint/format checks pass; production code is unchanged.
 - Vue typechecking, PHPStan, targeted frontend formatting/lint, production build, Pint, whitespace checks, and the design detector passed. Independent Standards and Spec reviews found no defects.
 - Additive migration applied only to confirmed local development database `cafe_pos`; test migrations ran against guarded `cafe_pos_test`.
 - No browser/app surface is available for visual inspection. No real merchant sandbox credentials or transactions were used; provider tests use HTTP fakes. Screen-size readability/scanning and actual Midtrans sandbox creation remain manual checks, not claimed passes.
