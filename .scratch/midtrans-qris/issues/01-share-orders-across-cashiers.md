@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately once implementation is authorized).
 
-**Status:** Awaiting Approval — implemented and verified; human acceptance pending.
+**Status:** Done — explicitly approved by the user on 2026-10-21.
 
 - [x] Order lists, search, filters, summaries, pagination, and direct order selection include other cashiers' orders consistently.
 - [x] Existing guest orders remain accessible to the same staff roles; private customer order access remains protected.
@@ -24,4 +24,5 @@
 - PHPStan, Vue typechecking, Pint, and whitespace checks passed.
 - Independent Standards review: no findings. Independent Spec review: no findings.
 - No QRIS charge, notification, expiry, payment-switching, or review-resolution functionality was implemented. Tickets 02–12 remain untouched.
-- GitHub publication remains pending access; no remote issue was modified or closed. This ticket is not marked Done until human approval.
+- GitHub publication remains pending access; no remote issue was modified or closed.
+- Human acceptance: the user explicitly approved this implementation on 2026-10-21. Ticket 01 is Done; this approval does not authorize starting ticket 02.
