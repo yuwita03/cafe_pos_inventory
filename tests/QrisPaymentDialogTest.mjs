@@ -97,7 +97,7 @@ function text(root) {
     return root.text + root.children.map(text).join('');
 }
 
-test('QR display preserves its countdown across closing, hides expired QR, disables payment controls, and emits close and view-order events', async (t) => {
+await test('QR display preserves its countdown across closing, hides expired QR, disables payment controls, and emits close and view-order events', async (t) => {
     let elapsed = 0;
     let tick;
     t.mock.method(performance, 'now', () => elapsed);
