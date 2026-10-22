@@ -36,6 +36,8 @@ const props = defineProps<{
 }>();
 
 const activeCategoryId = ref(0);
+const searchQuery = ref('');
+const failedImageIds = ref<number[]>([]);
 const page = usePage();
 const categoryNav = ref<HTMLElement | null>(null);
 const {
@@ -96,6 +98,27 @@ const categorySections = computed(() => {
         }))
         .filter((category) => category.products.length > 0);
 });
+const normalizedSearch = computed(() =>
+    searchQuery.value.trim().toLocaleLowerCase('id'),
+);
+const visibleCategorySections = computed(() =>
+    categorySections.value
+        .map((category) => ({
+            ...category,
+            products: category.products.filter((product) =>
+                `${product.name} ${product.description}`
+                    .toLocaleLowerCase('id')
+                    .includes(normalizedSearch.value),
+            ),
+        }))
+        .filter((category) => category.products.length > 0),
+);
+const searchResultCount = computed(() =>
+    visibleCategorySections.value.reduce(
+        (count, category) => count + category.products.length,
+        0,
+    ),
+);
 let categoryScrollFrame: number | null = null;
 const scrollBehavior = (): ScrollBehavior =>
     window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -103,6 +126,9 @@ const scrollBehavior = (): ScrollBehavior =>
         : 'smooth';
 
 function updateActiveCategoryOnScroll(): void {
+    if (normalizedSearch.value) {
+        return;
+    }
     if (categoryScrollFrame !== null) {
         cancelAnimationFrame(categoryScrollFrame);
     }
@@ -220,6 +246,10 @@ watch(activeCategoryId, async () => {
     await nextTick();
     keepActiveCategoryVisible();
 });
+watch(searchQuery, async () => {
+    await nextTick();
+    updateActiveCategoryOnScroll();
+});
 watch(categorySections, async () => {
     await nextTick();
     if (
@@ -241,6 +271,12 @@ onBeforeUnmount(() => {
 
 function isAvailable(product: PosProduct): boolean {
     return product.variants.some((variant) => variant.available);
+}
+
+function markImageUnavailable(productId: number): void {
+    if (!failedImageIds.value.includes(productId)) {
+        failedImageIds.value.push(productId);
+    }
 }
 
 function startingPrice(product: PosProduct): number {
@@ -308,7 +344,10 @@ function removeCartLine(key: string): void {
 <template>
     <main
         class="customer-menu"
-        :class="{ 'customer-order-screen': screen === 'cart' }"
+        :class="{
+            'customer-order-screen': screen === 'cart',
+            'customer-catalog-screen': screen === 'menu',
+        }"
     >
         <Head :title="pageTitle" />
         <header v-if="screen === 'menu'" class="customer-header">
@@ -321,45 +360,78 @@ function removeCartLine(key: string): void {
         </header>
 
         <section v-if="screen === 'menu'" class="customer-intro">
-            <span class="customer-kicker">SELAMAT DATANG</span>
-            <h1>Pesan yang kamu suka.</h1>
-            <p>Pilih menu, sesuaikan pesanan, lalu tambahkan ke keranjang.</p>
+            <h1>Pilih menu</h1>
+            <p>Minuman dan camilan untuk meja kamu.</p>
         </section>
 
-        <nav
-            v-if="screen === 'menu'"
-            ref="categoryNav"
-            class="customer-categories"
-            :class="{ 'is-dragging': isDraggingCategories }"
-            aria-label="Kategori menu"
-            tabindex="0"
-            @pointerdown="startCategoryDrag"
-            @pointermove="moveCategoryDrag"
-            @pointerup="stopCategoryDrag"
-            @pointercancel="stopCategoryDrag"
-            @lostpointercapture="stopCategoryDrag"
-            @pointerleave="!isDraggingCategories && stopCategoryDrag()"
-            @click.capture="preventDraggedCategoryClick"
-            @dragstart.prevent
+        <div
+            v-if="screen === 'menu' && categorySections.length"
+            class="customer-discovery"
         >
-            <button
-                v-for="category in categorySections"
-                :key="category.id"
-                :ref="(element) => setCategoryButton(category.id, element)"
-                type="button"
-                :aria-pressed="activeCategoryId === category.id"
-                @click="scrollToCategory(category.id)"
+            <div class="customer-search-wrap">
+                <label class="customer-search" for="customer-menu-search">
+                    <AppIcon name="search" :size="20" />
+                    <input
+                        id="customer-menu-search"
+                        v-model="searchQuery"
+                        type="search"
+                        aria-label="Cari menu"
+                        placeholder="Cari menu, misalnya latte"
+                        autocomplete="off"
+                    />
+                </label>
+                <button
+                    v-if="searchQuery"
+                    type="button"
+                    class="customer-search-clear"
+                    aria-label="Hapus pencarian"
+                    @click="searchQuery = ''"
+                >
+                    <AppIcon name="close" :size="18" />
+                </button>
+            </div>
+            <nav
+                v-if="!normalizedSearch"
+                ref="categoryNav"
+                class="customer-categories"
+                :class="{ 'is-dragging': isDraggingCategories }"
+                aria-label="Kategori menu"
+                tabindex="0"
+                @pointerdown="startCategoryDrag"
+                @pointermove="moveCategoryDrag"
+                @pointerup="stopCategoryDrag"
+                @pointercancel="stopCategoryDrag"
+                @lostpointercapture="stopCategoryDrag"
+                @pointerleave="!isDraggingCategories && stopCategoryDrag()"
+                @click.capture="preventDraggedCategoryClick"
+                @dragstart.prevent
             >
-                {{ category.name }}
-            </button>
-        </nav>
+                <button
+                    v-for="category in categorySections"
+                    :key="category.id"
+                    :ref="(element) => setCategoryButton(category.id, element)"
+                    type="button"
+                    :aria-pressed="activeCategoryId === category.id"
+                    @click="scrollToCategory(category.id)"
+                >
+                    {{ category.name }}
+                </button>
+            </nav>
+        </div>
 
         <div
             v-if="screen === 'menu' && categorySections.length"
             class="customer-catalog"
         >
+            <p
+                v-if="normalizedSearch"
+                class="customer-search-summary"
+                aria-live="polite"
+            >
+                {{ searchResultCount }} menu ditemukan
+            </p>
             <section
-                v-for="category in categorySections"
+                v-for="category in visibleCategorySections"
                 :id="`customer-category-${category.id}`"
                 :key="category.id"
                 class="customer-category-section"
@@ -381,41 +453,67 @@ function removeCartLine(key: string): void {
                     >
                         <div class="customer-product-image">
                             <img
-                                v-if="product.image"
+                                v-if="
+                                    product.image &&
+                                    !failedImageIds.includes(product.id)
+                                "
                                 :src="product.image"
-                                :alt="product.name"
+                                alt=""
                                 loading="lazy"
+                                @error="markImageUnavailable(product.id)"
                             /><span v-else class="customer-image-placeholder"
-                                ><AppIcon name="purchase" :size="25" /></span
+                                ><AppIcon name="image" :size="25" /></span
                             ><span
                                 v-if="!isAvailable(product)"
                                 class="customer-unavailable"
                                 >Tidak tersedia</span
                             >
                         </div>
-                        <span class="customer-product-name">{{
-                            product.name
-                        }}</span>
-                        <span class="customer-product-bottom"
-                            ><span
-                                ><small
-                                    v-if="
-                                        new Set(
-                                            product.variants.map(
-                                                (variant) => variant.price,
-                                            ),
-                                        ).size > 1
-                                    "
-                                    >Mulai </small
-                                >{{ rupiah(startingPrice(product)) }}</span
-                            ><AppIcon
-                                v-if="isAvailable(product)"
-                                name="plus"
-                                :size="18"
-                        /></span>
+                        <span class="customer-product-info">
+                            <span class="customer-product-name">{{
+                                product.name
+                            }}</span>
+                            <span
+                                v-if="product.description"
+                                class="customer-product-description"
+                                >{{ product.description }}</span
+                            >
+                            <span class="customer-product-bottom">
+                                <span class="customer-product-price">
+                                    <small
+                                        v-if="
+                                            new Set(
+                                                product.variants.map(
+                                                    (variant) => variant.price,
+                                                ),
+                                            ).size > 1
+                                        "
+                                        >Mulai </small
+                                    >{{ rupiah(startingPrice(product)) }}
+                                </span>
+                                <span
+                                    v-if="isAvailable(product)"
+                                    class="customer-product-action"
+                                    >Pilih</span
+                                >
+                                <span v-else class="customer-product-sold-out"
+                                    >Habis</span
+                                >
+                            </span>
+                        </span>
                     </button>
                 </div>
             </section>
+            <div
+                v-if="normalizedSearch && !searchResultCount"
+                class="customer-empty customer-search-empty"
+            >
+                <h2>Menu tidak ditemukan</h2>
+                <p>Coba nama lain atau lihat kategori menu.</p>
+                <button type="button" @click="searchQuery = ''">
+                    Lihat semua menu
+                </button>
+            </div>
         </div>
         <div v-else-if="screen === 'menu'" class="customer-empty">
             <span class="customer-empty-icon"
@@ -466,10 +564,12 @@ function removeCartLine(key: string): void {
             class="customer-cart-bar"
         >
             <span
-                ><AppIcon name="orders" :size="20" /> Lihat keranjang ·
+                ><AppIcon name="orders" :size="20" /> Keranjang ·
                 {{ itemCount }} item</span
             >
-            <strong>{{ rupiah(total) }}</strong>
+            <strong
+                >{{ rupiah(total) }} <AppIcon name="arrow" :size="18"
+            /></strong>
         </Link>
     </main>
 </template>
