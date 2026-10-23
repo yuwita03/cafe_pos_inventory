@@ -14,10 +14,13 @@ use App\Http\Controllers\Admin\TableController;
 use App\Http\Controllers\Auth\SessionController;
 use App\Http\Controllers\GuestMenuController;
 use App\Http\Controllers\GuestOrderController;
+use App\Http\Controllers\MidtransNotificationController;
 use App\Http\Middleware\EnsureUserIsActive;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
+Route::post('/payments/midtrans/notification', MidtransNotificationController::class)->name('payments.midtrans.notification');
+Route::post('/api/midtrans/notification', MidtransNotificationController::class);
 
 if (app()->environment('local', 'testing')) {
     Route::get('/menu', [GuestMenuController::class, 'index'])->name('guest.menu');
@@ -26,6 +29,7 @@ if (app()->environment('local', 'testing')) {
     Route::get('/menu/products/{product}/image', [GuestMenuController::class, 'productImage'])->name('guest.menu.product-image');
     Route::post('/menu/orders', [GuestOrderController::class, 'store'])->middleware('throttle:10,1')->name('guest.orders.store');
     Route::get('/menu/orders/{order:public_token}', [GuestOrderController::class, 'show'])->name('guest.orders.show');
+    Route::post('/menu/orders/{order:public_token}/retry-qris', [GuestOrderController::class, 'retryQris'])->middleware('throttle:10,1')->name('guest.orders.retry-qris');
     Route::middleware('guest')->group(function (): void {
         Route::get('/login', [SessionController::class, 'create'])->name('login');
         Route::post('/login', [SessionController::class, 'store'])->name('login.store');
@@ -40,7 +44,6 @@ if (app()->environment('local', 'testing')) {
             Route::get('/admin/inventory/history', [InventoryController::class, 'index'])->defaults('section', 'history')->name('admin.inventory.history');
             Route::post('/admin/inventory/items', [InventoryController::class, 'store'])->name('admin.inventory.items.store');
             Route::put('/admin/inventory/items/{stockItem}', [InventoryController::class, 'update'])->name('admin.inventory.items.update');
-            Route::patch('/admin/inventory/items/{stockItem}/quick-add', [InventoryController::class, 'quickAdd'])->name('admin.inventory.items.quickAdd');
             Route::post('/admin/inventory/adjustments', [InventoryController::class, 'adjust'])->name('admin.inventory.adjustments');
             Route::put('/admin/inventory/recipes/{variant}', [InventoryController::class, 'saveRecipe'])->name('admin.inventory.recipe');
             Route::put('/admin/inventory/option-ingredients/{option}', [InventoryController::class, 'saveOption'])->name('admin.inventory.option');
@@ -53,6 +56,7 @@ if (app()->environment('local', 'testing')) {
             Route::post('/admin/pos/checkout', [CashOrderController::class, 'checkout'])->name('admin.pos.checkout');
             Route::get('/admin/orders', [CashOrderController::class, 'orders'])->name('admin.orders');
             Route::post('/admin/orders/{order}/confirm-cash', [CashOrderController::class, 'confirmCash'])->name('admin.orders.confirm-cash');
+            Route::post('/admin/orders/{order}/retry-qris', [CashOrderController::class, 'retryQris'])->name('admin.orders.retry-qris');
         });
         Route::middleware('can:use-kitchen')->group(function (): void {
             Route::get('/admin/kitchen', [CashOrderController::class, 'kitchen'])->name('admin.kitchen');

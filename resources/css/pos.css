@@ -1002,3 +1002,17 @@
         transition: none;
     }
 }
+.pos-qris-image,
+.orders-qris-image {
+    display: flex;
+    justify-content: center;
+    margin: 1rem 0;
+}
+
+.pos-qris-image img,
+.orders-qris-image img {
+    width: min(100%, 280px);
+    aspect-ratio: 1;
+    object-fit: contain;
+    background: white;
+}

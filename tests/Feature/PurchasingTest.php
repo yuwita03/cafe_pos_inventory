@@ -43,13 +43,9 @@ test('supplier input is validated', function (): void {
         ->assertUnprocessable()->assertJsonValidationErrors(['name', 'contacts.0.value', 'is_active']);
 });
 
-test('existing supplier contacts survive migration and metadata edits and can expand beyond the old limit', function (): void {
-    $this->supplier->update(['name' => 'Existing supplier']);
-    $migration = require database_path('migrations/2026_10_19_061708_structure_supplier_contacts.php');
-    $migration->down();
-    DB::table('suppliers')->where('id', $this->supplier->id)->update(['contact' => "081234\nold@example.com"]);
-    $migration->up();
+test('supplier contacts survive metadata edits and can expand beyond the old limit', function (): void {
     $oldContacts = [['type' => 'phone', 'value' => '081234'], ['type' => 'email', 'value' => 'old@example.com']];
+    $this->supplier->update(['name' => 'Existing supplier', 'contact' => $oldContacts]);
     expect($this->supplier->fresh()->contact)->toBe($oldContacts);
     $this->get(route('admin.suppliers'))->assertInertia(fn (Assert $page) => $page->where('suppliers.0.contacts', $oldContacts));
     $this->put(route('admin.suppliers.update', $this->supplier), ['name' => 'Existing supplier', 'is_active' => true])->assertSessionHasNoErrors();

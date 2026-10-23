@@ -7,7 +7,6 @@ export interface StockItem {
     reserved: number;
     threshold: number;
     active: boolean;
-    quickAdd: boolean;
     available: number;
     lowStock: boolean;
 }

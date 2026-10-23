@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DevelopmentOwnerSeeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -9,6 +10,22 @@ beforeEach(function () {
         'email' => 'owner@example.com',
         'password' => 'local-owner-password',
     ]);
+});
+
+test('default seeding creates the configured owner and can be rerun safely', function () {
+    $this->seed(DatabaseSeeder::class);
+    $this->assertDatabaseHas('users', ['email' => 'owner@example.com', 'role' => 'owner', 'is_active' => true]);
+    $owner = User::query()->where('email', 'owner@example.com')->sole();
+    expect(Hash::check('local-owner-password', $owner->password))->toBeTrue();
+
+    $this->seed(DatabaseSeeder::class);
+
+    $this->assertDatabaseCount('users', 1);
+    $this->assertDatabaseMissing('users', ['email' => 'test@example.com']);
+    expect($owner->fresh()->password)->toBe($owner->password);
+    foreach (['categories', 'products', 'stock_items', 'cafe_tables', 'suppliers', 'orders', 'payments'] as $table) {
+        $this->assertDatabaseCount($table, 0);
+    }
 });
 
 test('seeds one active owner with a hashed password and preserves it on reruns', function () {

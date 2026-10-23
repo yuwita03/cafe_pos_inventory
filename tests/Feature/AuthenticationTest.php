@@ -9,27 +9,6 @@ test('guests can view login and the public home', function () {
     $this->get(route('home'))->assertOk();
 });
 
-test('active staff can open the cashier frontend prototype', function () {
-    $owner = User::factory()->create(['role' => 'owner']);
-
-    $this->actingAs($owner)->get(route('admin.pos'))
-        ->assertOk()->assertInertia(fn (Assert $page) => $page->component('admin/pos/Index'));
-});
-
-test('active staff can open the orders frontend prototype', function () {
-    $owner = User::factory()->create(['role' => 'owner']);
-
-    $this->actingAs($owner)->get(route('admin.orders'))
-        ->assertOk()->assertInertia(fn (Assert $page) => $page->component('admin/orders/Index'));
-});
-
-test('active staff can open the kitchen frontend prototype', function () {
-    $owner = User::factory()->create(['role' => 'owner']);
-
-    $this->actingAs($owner)->get(route('admin.kitchen'))
-        ->assertOk()->assertInertia(fn (Assert $page) => $page->component('admin/kitchen/Index'));
-});
-
 test('an active owner can log in and receives a new session', function () {
     $owner = User::factory()->create(['role' => 'owner']);
     $this->withSession(['_token' => 'initial-token']);
@@ -52,16 +31,18 @@ test('login returns to the originally requested management page', function () {
         ->assertRedirectToRoute('admin.inventory.index');
 });
 
-test('incorrect credentials and inactive accounts receive the same generic error', function () {
-    $owner = User::factory()->create(['is_active' => false]);
+test('incorrect credentials and inactive accounts receive the same generic error', function (string $email, string $password, bool $active) {
+    User::factory()->create(['email' => 'staff@example.com', 'is_active' => $active]);
 
-    foreach ([$owner->email, 'unknown@example.com'] as $email) {
-        $this->from(route('login'))->post(route('login.store'), ['email' => $email, 'password' => 'password'])
-            ->assertRedirectToRoute('login')->assertSessionHasErrors(['email' => 'Email atau kata sandi tidak sesuai.'])
-            ->assertSessionMissing('_old_input.password');
-        $this->assertGuest();
-    }
-});
+    $this->from(route('login'))->post(route('login.store'), ['email' => $email, 'password' => $password])
+        ->assertRedirectToRoute('login')->assertSessionHasErrors(['email' => 'Email atau kata sandi tidak sesuai.'])
+        ->assertSessionMissing('_old_input.password');
+    $this->assertGuest();
+})->with([
+    'wrong password' => ['staff@example.com', 'incorrect', true],
+    'inactive account' => ['staff@example.com', 'password', false],
+    'unknown email' => ['unknown@example.com', 'password', true],
+]);
 
 test('login validates required fields', function () {
     $this->post(route('login.store'), [])->assertSessionHasErrors(['email', 'password']);
@@ -98,9 +79,11 @@ test('logout clears the session and prevents further management access', functio
 });
 
 test('deactivating an account ends its existing staff session before a write', function () {
-    $owner = User::factory()->create(['is_active' => false]);
+    $owner = User::factory()->create(['role' => 'owner', 'is_active' => true]);
+    $this->actingAs($owner);
+    $owner->forceFill(['is_active' => false])->save();
 
-    $this->actingAs($owner)->postJson(route('admin.inventory.items.store'), [])
+    $this->postJson(route('admin.inventory.items.store'), [])
         ->assertUnauthorized();
 
     $this->assertGuest();

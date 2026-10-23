@@ -36,7 +36,8 @@ final class CashOrders
         $data['customer_email'] = isset($data['customer_email']) ? trim($data['customer_email']) : null;
         $data['table_id'] = isset($data['table_id']) ? (int) $data['table_id'] : null;
         $data['expected_total_idr'] = (int) $data['expected_total_idr'];
-        $data['cash_received_idr'] = $actor ? (int) $data['cash_received_idr'] : null;
+        $data['payment_method'] = $data['payment_method'] ?? 'cash';
+        $data['cash_received_idr'] = $actor && $data['payment_method'] === 'cash' ? (int) ($data['cash_received_idr'] ?? 0) : null;
         foreach ($data['items'] as &$line) {
             $line['variant_id'] = (int) $line['variant_id'];
             $line['quantity'] = (int) $line['quantity'];
@@ -47,7 +48,11 @@ final class CashOrders
             sort($line['option_ids']);
         }
         unset($line);
-        $fingerprint = hash('sha256', json_encode($data, JSON_THROW_ON_ERROR));
+        $fingerprintData = $data;
+        if ($data['payment_method'] === 'cash') {
+            unset($fingerprintData['payment_method']);
+        }
+        $fingerprint = hash('sha256', json_encode($fingerprintData, JSON_THROW_ON_ERROR));
 
         return DB::transaction(function () use ($actor, $data, $fingerprint): Order {
             if ($actor) {
@@ -99,7 +104,7 @@ final class CashOrders
             if ($total !== $data['expected_total_idr']) {
                 throw ValidationException::withMessages(['expected_total_idr' => 'Harga menu berubah. Muat ulang menu dan periksa ulang pesanan sebelum membayar.']);
             }
-            if ($actor && $data['cash_received_idr'] < $total) {
+            if ($actor && $data['payment_method'] === 'cash' && $data['cash_received_idr'] < $total) {
                 throw ValidationException::withMessages(['cash_received_idr' => 'Uang tunai tidak mencukupi total pesanan.']);
             }
             $stocks = StockItem::whereIn('id', array_keys($requirements))->orderBy('id')->lockForUpdate()->get();
@@ -114,7 +119,7 @@ final class CashOrders
                 'table_id' => $data['table_id'], 'created_by_user_id' => $actor?->id,
                 'customer_name' => $data['customer_name'], 'customer_email' => $data['customer_email'],
                 'source' => $actor ? 'cashier' : 'table_qr', 'fulfillment_type' => $actor ? $data['fulfillment_type'] : 'dine_in',
-                'status' => $actor ? 'queued' : 'awaiting_payment', 'public_token' => Str::random(64), 'checkout_key' => $data['checkout_key'],
+                'status' => $actor && $data['payment_method'] === 'cash' ? 'queued' : 'awaiting_payment', 'public_token' => Str::random(64), 'checkout_key' => $data['checkout_key'],
                 'checkout_fingerprint' => $fingerprint, 'total_idr' => $total,
             ]);
             foreach ($snapshots as $snapshot) {
@@ -127,13 +132,16 @@ final class CashOrders
                     DB::table('order_item_options')->insert(['order_item_id' => $itemId, 'option_id' => $option->id, 'option_name_snapshot' => $option->name, 'price_delta_idr' => $option->price_delta_idr]);
                 }
             }
-            $expiresAt = $actor ? null : now()->addMinutes(30);
+            $expiresAt = $actor && $data['payment_method'] === 'cash' ? null : now()->addMinutes(30);
             foreach ($requirements as $stockId => $milli) {
                 if ($milli > 0) {
                     DB::table('stock_reservations')->insert(['order_id' => $order->id, 'stock_item_id' => $stockId, 'quantity' => StockQuantity::decimal($milli), 'status' => 'active', 'expires_at' => $expiresAt]);
                 }
             }
-            DB::table('payments')->insert(['order_id' => $order->id, 'method' => 'cash', 'amount_idr' => $total, 'status' => $actor ? 'paid' : 'pending', 'paid_at' => $actor ? now() : null, 'created_at' => now(), 'cash_received_idr' => $data['cash_received_idr'], 'change_idr' => $actor ? $data['cash_received_idr'] - $total : null]);
+            $paymentId = DB::table('payments')->insertGetId(['order_id' => $order->id, 'method' => $data['payment_method'], 'provider' => $data['payment_method'] === 'qris' ? 'midtrans' : null, 'amount_idr' => $total, 'status' => $actor && $data['payment_method'] === 'cash' ? 'paid' : 'pending', 'paid_at' => $actor && $data['payment_method'] === 'cash' ? now() : null, 'created_at' => now(), 'cash_received_idr' => $data['cash_received_idr'], 'change_idr' => $actor && $data['payment_method'] === 'cash' ? $data['cash_received_idr'] - $total : null]);
+            if ($data['payment_method'] === 'qris') {
+                DB::table('payments')->where('id', $paymentId)->update(['provider_reference' => 'CAFE-'.Str::uuid()]);
+            }
 
             return $order;
         }, 3);
@@ -240,6 +248,7 @@ final class CashOrders
                 'customerName' => $order->customer_name, 'customerEmail' => $order->customer_email, 'source' => $order->source, 'fulfillment' => $order->fulfillment_type,
                 'table' => $tables->get($order->table_id), 'tableId' => $order->table_id, 'status' => $order->status, 'paymentStatus' => $payment->status ?? 'pending',
                 'method' => $payment->method ?? 'cash', 'reference' => $payment?->provider_reference,
+                'qrImageUrl' => $payment?->method === 'qris' && $order->status === 'awaiting_payment' && $payment->status === 'pending' ? $payment->qr_image_url : null,
                 'received' => $payment?->cash_received_idr === null ? null : (int) $payment->cash_received_idr,
                 'change' => $payment?->change_idr === null ? null : (int) $payment->change_idr,
                 'createdAt' => $order->created_at->toIso8601String(), 'paidAt' => $payment?->paid_at ? Carbon::parse($payment->paid_at)->toIso8601String() : null,

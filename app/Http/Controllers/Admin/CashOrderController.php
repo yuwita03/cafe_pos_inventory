@@ -14,6 +14,7 @@ use App\Models\OptionGroup;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\QrisPayments;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -49,7 +50,7 @@ class CashOrderController extends Controller
         ]);
     }
 
-    public function checkout(CashCheckoutRequest $request, CashOrders $cash): JsonResponse
+    public function checkout(CashCheckoutRequest $request, CashOrders $cash, QrisPayments $payments): JsonResponse
     {
         try {
             $order = $cash->checkout($request->user(), $request->validated());
@@ -60,7 +61,11 @@ class CashOrderController extends Controller
             throw $exception;
         }
 
-        return response()->json(['order' => $cash->present(collect([$order]))[0]]);
+        if (($request->validated('payment_method') ?? 'cash') === 'qris') {
+            $payments->ensureCharge($order);
+        }
+
+        return response()->json(['order' => $cash->present(collect([$order->fresh()]))[0]]);
     }
 
     public function orders(Request $request, CashOrders $cash): Response
@@ -113,6 +118,15 @@ class CashOrderController extends Controller
         $cash->confirmGuestCash($order->id, (int) $data['cash_received_idr']);
 
         return back()->with('success', 'Pembayaran tunai dikonfirmasi.');
+    }
+
+    public function retryQris(Request $request, Order $order, QrisPayments $payments): RedirectResponse
+    {
+        abort_unless(in_array($request->user()?->role, ['owner', 'cashier'], true), 403);
+        abort_unless($request->user()->role === 'owner' || $order->source === 'table_qr' || $order->created_by_user_id === $request->user()->id, 403);
+        $payments->ensureCharge($order);
+
+        return back();
     }
 
     public function kitchen(Request $request, CashOrders $cash): Response
