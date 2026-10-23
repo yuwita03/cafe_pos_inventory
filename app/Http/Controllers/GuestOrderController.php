@@ -5,15 +5,17 @@ namespace App\Http\Controllers;
 use App\CashOrders;
 use App\Http\Requests\GuestOrderCheckoutRequest;
 use App\Models\Order;
+use App\QrisPayments;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class GuestOrderController extends Controller
 {
-    public function store(GuestOrderCheckoutRequest $request, CashOrders $cash): JsonResponse
+    public function store(GuestOrderCheckoutRequest $request, CashOrders $cash, QrisPayments $payments): JsonResponse
     {
         try {
             $order = $cash->guestCheckout($request->validated());
@@ -24,8 +26,12 @@ class GuestOrderController extends Controller
             throw $exception;
         }
 
+        if (($request->validated('payment_method') ?? 'cash') === 'qris') {
+            $payments->ensureCharge($order);
+        }
+
         return response()->json([
-            'order' => $cash->present(collect([$order]))[0],
+            'order' => $cash->present(collect([$order->fresh()]))[0],
             'statusUrl' => route('guest.orders.show', ['order' => $order->public_token], false),
         ]);
     }
@@ -38,5 +44,13 @@ class GuestOrderController extends Controller
         return Inertia::render('guest/OrderStatus', [
             'order' => $cash->present(collect([$order->fresh()]))[0],
         ]);
+    }
+
+    public function retryQris(Order $order, QrisPayments $payments): RedirectResponse
+    {
+        abort_unless($order->source === 'table_qr', 404);
+        $payments->ensureCharge($order);
+
+        return redirect()->route('guest.orders.show', ['order' => $order->public_token]);
     }
 }

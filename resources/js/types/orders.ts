@@ -30,6 +30,7 @@ export interface OrderData {
     paymentStatus: keyof typeof paymentStates;
     method: 'cash' | 'qris';
     reference: string | null;
+    qrImageUrl: string | null;
     received: number | null;
     change: number | null;
     createdAt: string;

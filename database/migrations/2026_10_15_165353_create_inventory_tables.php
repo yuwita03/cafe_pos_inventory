@@ -48,10 +48,32 @@ return new class extends Migration
             $table->index(['stock_item_id', 'created_at']);
         });
         if (DB::getDriverName() === 'pgsql') {
-            DB::statement("ALTER TABLE stock_items ADD CONSTRAINT stock_items_unit_valid CHECK (base_unit IN ('g', 'ml', 'pcs')), ADD CONSTRAINT stock_items_on_hand_nonnegative CHECK (on_hand_qty >= 0), ADD CONSTRAINT stock_items_reorder_nonnegative CHECK (reorder_point >= 0)");
-            DB::statement('ALTER TABLE recipe_items ADD CONSTRAINT recipe_items_quantity_positive CHECK (quantity > 0)');
-            DB::statement('ALTER TABLE option_ingredients ADD CONSTRAINT option_ingredients_quantity_nonnegative CHECK (additional_qty >= 0)');
-            DB::statement('ALTER TABLE stock_movements ADD CONSTRAINT stock_movements_delta_nonzero CHECK (quantity_delta <> 0), ADD CONSTRAINT stock_movements_reason_required CHECK (length(trim(reason)) > 0)');
+            DB::statement(<<<'SQL'
+                ALTER TABLE stock_items
+                    ADD CONSTRAINT stock_items_unit_valid
+                        CHECK (base_unit IN ('g', 'ml', 'pcs')),
+                    ADD CONSTRAINT stock_items_on_hand_nonnegative
+                        CHECK (on_hand_qty >= 0),
+                    ADD CONSTRAINT stock_items_reorder_nonnegative
+                        CHECK (reorder_point >= 0)
+                SQL);
+            DB::statement(<<<'SQL'
+                ALTER TABLE recipe_items
+                    ADD CONSTRAINT recipe_items_quantity_positive
+                        CHECK (quantity > 0)
+                SQL);
+            DB::statement(<<<'SQL'
+                ALTER TABLE option_ingredients
+                    ADD CONSTRAINT option_ingredients_quantity_nonnegative
+                        CHECK (additional_qty >= 0)
+                SQL);
+            DB::statement(<<<'SQL'
+                ALTER TABLE stock_movements
+                    ADD CONSTRAINT stock_movements_delta_nonzero
+                        CHECK (quantity_delta <> 0),
+                    ADD CONSTRAINT stock_movements_reason_required
+                        CHECK (length(trim(reason)) > 0)
+                SQL);
         }
     }
 

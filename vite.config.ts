@@ -67,6 +67,7 @@ export default defineConfig({
         singleAttributePerLine: false,
         htmlWhitespaceSensitivity: 'css',
         ignorePatterns: [
+            '**/*.md',
             '.github/**',
             'composer.json',
             'resources/js/components/ui/*',

@@ -35,6 +35,21 @@ const loading = ref(false);
 const refreshing = ref(false);
 const cashReceived = ref<number | string>('');
 const confirmingCash = ref(false);
+const retryingQris = ref(false);
+function retrySelectedQris(order: OrderData): void {
+    if (retryingQris.value) return;
+    retryingQris.value = true;
+    router.post(
+        `/admin/orders/${order.id}/retry-qris`,
+        {},
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                retryingQris.value = false;
+            },
+        },
+    );
+}
 const cashError = ref('');
 const selected = computed(() => {
     if (selectedNumber.value === props.selectedOrder?.number) {
@@ -487,6 +502,36 @@ function confirmSelectedCash(): void {
                 </section>
                 <section class="orders-detail-section">
                     <h3>Pembayaran</h3>
+                    <div
+                        v-if="
+                            selected.method === 'qris' &&
+                            selected.status === 'awaiting_payment' &&
+                            selected.paymentStatus === 'pending'
+                        "
+                    >
+                        <div
+                            v-if="selected.qrImageUrl"
+                            class="orders-qris-image"
+                        >
+                            <img
+                                :src="selected.qrImageUrl"
+                                :alt="`QRIS pembayaran ${selected.number}`"
+                            />
+                        </div>
+                        <BaseButton
+                            v-else
+                            :disabled="retryingQris"
+                            @click="retrySelectedQris(selected)"
+                            >{{
+                                retryingQris
+                                    ? 'Memuat QRIS…'
+                                    : 'Coba tampilkan QRIS'
+                            }}</BaseButton
+                        >
+                        <p v-if="selected.expiresAt" class="orders-detail-help">
+                            Batas bayar: {{ date(selected.expiresAt) }}
+                        </p>
+                    </div>
                     <dl class="orders-info-grid">
                         <div>
                             <dt>Metode</dt>

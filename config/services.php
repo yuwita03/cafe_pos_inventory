@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'midtrans' => [
+        'server_key' => env('MIDTRANS_SANDBOX_SERVER_KEY'),
+    ],
+
 ];

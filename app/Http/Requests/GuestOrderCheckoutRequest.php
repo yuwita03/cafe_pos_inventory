@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class GuestOrderCheckoutRequest extends FormRequest
 {
@@ -15,6 +16,7 @@ class GuestOrderCheckoutRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'payment_method' => ['sometimes', Rule::in(['cash', 'qris'])],
             'checkout_key' => ['required', 'uuid'],
             'table_id' => ['required', 'integer', 'exists:cafe_tables,id'],
             'customer_name' => ['required', 'string', 'max:120'],

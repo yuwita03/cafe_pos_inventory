@@ -8,7 +8,6 @@ use App\Http\Requests\Admin\InventoryRequirementsRequest;
 use App\Http\Requests\Admin\SaveOptionIngredientsRequest;
 use App\Http\Requests\Admin\SaveStockItemRequest;
 use App\Http\Requests\Admin\SaveVariantRecipeRequest;
-use App\Http\Requests\Admin\SetStockQuickAddRequest;
 use App\InventoryRequirements;
 use App\InventoryStock;
 use App\Models\Option;
@@ -49,7 +48,7 @@ class InventoryController extends Controller
             'stockItems' => StockItem::orderBy('name')->orderBy('id')->get()->map(fn (StockItem $item): array => [
                 'id' => $item->id, 'name' => $item->name, 'unit' => $item->base_unit,
                 'onHand' => (float) $item->on_hand_qty, 'reserved' => (float) ($reservations[$item->id] ?? 0), 'available' => (StockQuantity::milli($item->on_hand_qty) - StockQuantity::milli($reservations[$item->id] ?? '0')) / 1000,
-                'threshold' => (float) $item->reorder_point, 'active' => $item->is_active, 'quickAdd' => $item->is_quick_add,
+                'threshold' => (float) $item->reorder_point, 'active' => $item->is_active,
                 'lowStock' => $item->is_active && StockQuantity::milli($item->on_hand_qty) - StockQuantity::milli($reservations[$item->id] ?? '0') <= StockQuantity::milli($item->reorder_point),
             ]),
             'stockMovements' => StockMovement::with('actor')->orderByDesc('created_at')->orderByDesc('id')->get()->map(fn (StockMovement $movement): array => [
@@ -104,20 +103,6 @@ class InventoryController extends Controller
         });
 
         return back()->with('success', 'Item stok berhasil diperbarui.');
-    }
-
-    public function quickAdd(SetStockQuickAddRequest $request, StockItem $stockItem): RedirectResponse
-    {
-        DB::transaction(function () use ($request, $stockItem): void {
-            $item = StockItem::query()->lockForUpdate()->findOrFail($stockItem->id);
-            $enabled = $request->boolean('is_quick_add');
-            if ($enabled && $item->base_unit === 'pcs') {
-                throw ValidationException::withMessages(['is_quick_add' => 'Tambah cepat bahan hanya tersedia untuk item dengan unit g atau ml.']);
-            }
-            $item->update(['is_quick_add' => $enabled]);
-        });
-
-        return back()->with('success', 'Preferensi tambah cepat disimpan.');
     }
 
     public function adjust(AdjustStockRequest $request, InventoryStock $stock): RedirectResponse

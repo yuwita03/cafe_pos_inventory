@@ -56,9 +56,21 @@ return new class extends Migration
             $table->primary(['product_id', 'option_group_id']);
         });
         if (DB::getDriverName() === 'pgsql') {
-            DB::statement('ALTER TABLE product_variants ADD CONSTRAINT product_variants_price_nonnegative CHECK (price_idr >= 0)');
-            DB::statement('ALTER TABLE options ADD CONSTRAINT options_price_nonnegative CHECK (price_delta_idr >= 0)');
-            DB::statement("ALTER TABLE option_groups ADD CONSTRAINT option_groups_selection_valid CHECK (selection_type IN ('single', 'multiple'))");
+            DB::statement(<<<'SQL'
+                ALTER TABLE product_variants
+                    ADD CONSTRAINT product_variants_price_nonnegative
+                        CHECK (price_idr >= 0)
+                SQL);
+            DB::statement(<<<'SQL'
+                ALTER TABLE options
+                    ADD CONSTRAINT options_price_nonnegative
+                        CHECK (price_delta_idr >= 0)
+                SQL);
+            DB::statement(<<<'SQL'
+                ALTER TABLE option_groups
+                    ADD CONSTRAINT option_groups_selection_valid
+                        CHECK (selection_type IN ('single', 'multiple'))
+                SQL);
         }
     }
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import AppIcon from '@/components/AppIcon.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import { menu } from '@/routes/guest';
@@ -9,6 +9,7 @@ import { orderStates, paymentStates, type OrderData } from '@/types/orders';
 
 const props = defineProps<{ order: OrderData }>();
 const heading = ref<HTMLHeadingElement | null>(null);
+const retrying = ref(false);
 const menuUrl = computed(() =>
     menu.url({ query: { table: props.order.tableId ?? undefined } }),
 );
@@ -25,16 +26,48 @@ const deadline = computed(() =>
 );
 
 onMounted(() => heading.value?.focus());
+function retryQris(): void {
+    if (retrying.value) return;
+    retrying.value = true;
+    router.post(
+        `${window.location.pathname}/retry-qris`,
+        {},
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                retrying.value = false;
+            },
+        },
+    );
+}
 </script>
 
 <template>
     <section>
         <header class="customer-order-header">
             <span aria-hidden="true"></span>
-            <h1 ref="heading" tabindex="-1">Pesanan tunai</h1>
+            <h1 ref="heading" tabindex="-1">
+                {{
+                    order.method === 'qris'
+                        ? 'Pembayaran QRIS'
+                        : 'Pesanan tunai'
+                }}
+            </h1>
             <span aria-hidden="true"></span>
         </header>
         <div class="customer-order-content customer-cash-content">
+            <div
+                v-if="order.method === 'qris' && order.paymentStatus === 'paid'"
+                class="customer-payment-success"
+                role="status"
+                aria-live="polite"
+            >
+                <strong>Pembayaran berhasil</strong>
+                <span
+                    >Status pesanan:
+                    {{ orderStates[order.status].label }}.</span
+                >
+            </div>
             <section
                 class="customer-cash-receipt"
                 aria-labelledby="cash-receipt-title"
@@ -45,7 +78,7 @@ onMounted(() => heading.value?.focus());
                     <p class="customer-cash-table">Meja {{ order.table }}</p>
                     <span class="customer-cash-unpaid"
                         >{{ paymentStates[order.paymentStatus].label }} ·
-                        CASH</span
+                        {{ order.method === 'qris' ? 'QRIS' : 'CASH' }}</span
                     >
                 </div>
                 <dl class="customer-cash-details">
@@ -98,7 +131,7 @@ onMounted(() => heading.value?.focus());
                 <p class="customer-cash-disclaimer">
                     {{
                         order.paymentStatus === 'paid'
-                            ? 'Pembayaran tunai telah dikonfirmasi kasir.'
+                            ? 'Pembayaran telah terverifikasi.'
                             : 'Ringkasan ini bukan bukti pembayaran.'
                     }}
                 </p>
@@ -116,7 +149,33 @@ onMounted(() => heading.value?.focus());
                 aria-labelledby="cash-next-title"
             >
                 <h2 id="cash-next-title">Langkah berikutnya</h2>
-                <p v-if="order.paymentStatus === 'pending'">
+                <template
+                    v-if="
+                        order.method === 'qris' &&
+                        order.paymentStatus === 'pending'
+                    "
+                >
+                    <div v-if="order.qrImageUrl" class="customer-qris-image">
+                        <img
+                            :src="order.qrImageUrl"
+                            :alt="`QRIS pembayaran ${order.number}`"
+                        />
+                    </div>
+                    <BaseButton :disabled="retrying" @click="retryQris">{{
+                        retrying
+                            ? 'Memeriksa pembayaran…'
+                            : order.qrImageUrl
+                              ? 'Periksa status pembayaran'
+                              : 'Coba tampilkan QRIS'
+                    }}</BaseButton>
+                    <p>
+                        Buka aplikasi bank atau dompet digital, bayar sesuai
+                        total, lalu tunggu status terverifikasi. Jika memakai
+                        ponsel yang sama, simpan gambar QRIS untuk dibuka dari
+                        aplikasi pembayaran.
+                    </p>
+                </template>
+                <p v-else-if="order.paymentStatus === 'pending'">
                     Tunjukkan nomor pesanan ini kepada kasir dan bayar sebelum
                     batas waktu. Pesanan mulai diproses setelah kasir
                     mengonfirmasi pembayaran.
@@ -125,12 +184,20 @@ onMounted(() => heading.value?.focus());
                     Batas pembayaran telah lewat. Pesanan ini tidak dapat
                     dibayar; buat pesanan baru dengan harga dan stok terbaru.
                 </p>
+                <p v-else-if="order.paymentStatus === 'failed'">
+                    Pembayaran gagal. Pesanan ini tidak dapat dibayar; buat
+                    pesanan baru dengan harga dan stok terbaru.
+                </p>
                 <p v-else>
                     {{ orderStates[order.status].label }}. Halaman ini akan
                     memperbarui status pesanan.
                 </p>
                 <Link
-                    v-if="order.paymentStatus === 'expired' && order.tableId"
+                    v-if="
+                        (order.paymentStatus === 'expired' ||
+                            order.paymentStatus === 'failed') &&
+                        order.tableId
+                    "
                     :href="menuUrl"
                     class="button"
                     >Buat pesanan baru <AppIcon name="arrow" :size="16"

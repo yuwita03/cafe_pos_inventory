@@ -16,12 +16,13 @@ class CashCheckoutRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'payment_method' => ['sometimes', Rule::in(['cash', 'qris'])],
             'checkout_key' => ['required', 'uuid'],
             'customer_name' => ['required', 'string', 'max:120'],
             'fulfillment_type' => ['required', Rule::in(['dine_in', 'takeaway'])],
             'table_id' => ['nullable', 'required_if:fulfillment_type,dine_in', 'prohibited_if:fulfillment_type,takeaway', 'integer', 'exists:cafe_tables,id'],
             'expected_total_idr' => ['required', 'integer', 'min:1', 'max:9007199254740991'],
-            'cash_received_idr' => ['required', 'integer', 'min:1', 'max:9007199254740991'],
+            'cash_received_idr' => [Rule::requiredIf(fn (): bool => $this->input('payment_method', 'cash') === 'cash'), Rule::prohibitedIf(fn (): bool => $this->input('payment_method') === 'qris'), 'integer', 'min:1', 'max:9007199254740991'],
             'items' => ['required', 'array', 'min:1', 'max:100'],
             'items.*' => ['required', 'array:variant_id,option_ids,quantity'],
             'items.*.variant_id' => ['required', 'integer', 'exists:product_variants,id'],

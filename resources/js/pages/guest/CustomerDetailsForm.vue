@@ -25,6 +25,7 @@ const checkoutAlert = ref<HTMLElement | null>(null);
 const statusUrl = ref<string | null>(null);
 type CheckoutPayload = {
     checkout_key: string;
+    payment_method: 'cash' | 'qris';
     table_id: number;
     customer_name: string;
     customer_email: string | null;
@@ -77,18 +78,19 @@ watch(checkoutError, async (message) => {
     }
 });
 
-function continueToCash(): void {
-    if (paymentMethod.value === 'cash' && customerName.value.trim()) {
+function continueToPayment(): void {
+    if (paymentMethod.value && customerName.value.trim()) {
         confirmingOrder.value = true;
     }
 }
 
-async function confirmCashOrder(): Promise<void> {
+async function confirmOrder(): Promise<void> {
     if (processing.value || statusUrl.value) {
         return;
     }
     pendingCheckout.value ??= {
         checkout_key: crypto.randomUUID(),
+        payment_method: paymentMethod.value ?? 'cash',
         table_id: props.tableId,
         customer_name: customerName.value.trim(),
         customer_email: customerEmail.value.trim() || null,
@@ -154,7 +156,7 @@ async function confirmCashOrder(): Promise<void> {
         window.location.assign(data.statusUrl);
     } catch {
         checkoutError.value = statusUrl.value
-            ? 'Pesanan sudah dibuat. Buka struk pesanan untuk membayar di kasir.'
+            ? 'Pesanan sudah dibuat. Buka halaman pesanan untuk melihat pembayaran.'
             : 'Hasil pesanan belum dapat dipastikan. Coba ulang dengan data yang sama.';
     } finally {
         processing.value = false;
@@ -167,7 +169,7 @@ onMounted(() => {
         statusUrl.value = sessionStorage.getItem(statusRecoveryKey);
         if (statusUrl.value) {
             checkoutError.value =
-                'Pesanan sudah dibuat. Buka struk pesanan untuk membayar di kasir.';
+                'Pesanan sudah dibuat. Buka halaman pesanan untuk melihat pembayaran.';
             return;
         }
         const saved = sessionStorage.getItem(recoveryKey);
@@ -180,7 +182,7 @@ onMounted(() => {
                 pendingCheckout.value = payload;
                 customerName.value = payload.customer_name;
                 customerEmail.value = payload.customer_email ?? '';
-                paymentMethod.value = 'cash';
+                paymentMethod.value = payload.payment_method ?? 'cash';
                 checkoutError.value =
                     'Ada pesanan yang hasilnya belum dipastikan. Coba ulang sebelum membuat pesanan lain.';
                 confirmingOrder.value = true;
@@ -207,8 +209,12 @@ onMounted(() => {
                 melanjutkan.
             </p>
             <p class="customer-confirm-note">
-                Pesanan akan dibuat dengan status belum dibayar. Tunjukkan nomor
-                pesanan kepada kasir untuk membayar tunai.
+                Pesanan akan dibuat dengan status belum dibayar.
+                {{
+                    paymentMethod === 'qris'
+                        ? 'Kode QRIS akan tampil pada halaman pesanan.'
+                        : 'Tunjukkan nomor pesanan kepada kasir untuk membayar tunai.'
+                }}
             </p>
             <a v-if="statusUrl" :href="statusUrl">Lihat struk pesanan</a>
             <template #footer>
@@ -218,7 +224,7 @@ onMounted(() => {
                 <BaseButton
                     variant="primary"
                     :disabled="processing || Boolean(statusUrl)"
-                    @click="confirmCashOrder"
+                    @click="confirmOrder"
                     >{{
                         processing
                             ? 'Membuat pesanan…'
@@ -282,7 +288,7 @@ onMounted(() => {
                 :id="formId"
                 class="customer-details-form"
                 aria-describedby="customer-details-preview"
-                @submit.prevent="continueToCash"
+                @submit.prevent="continueToPayment"
             >
                 <label for="customer-name">Nama pemesan (wajib)</label>
                 <input
@@ -312,15 +318,13 @@ onMounted(() => {
                             v-model="paymentMethod"
                             name="payment_method"
                             value="qris"
-                            disabled
                         />
                         <span
                             ><strong
                                 ><AppIcon name="qr" :size="18" /> QRIS</strong
                             ><small
                                 >Bayar dengan aplikasi bank atau dompet digital
-                                (belum tersedia)</small
-                            ></span
+                            </small></span
                         >
                     </label>
                     <label>
@@ -344,8 +348,19 @@ onMounted(() => {
                     aria-labelledby="payment-guide-title"
                 >
                     <h2 id="payment-guide-title">Cara pembayaran</h2>
-                    <h3>CASH</h3>
-                    <ol>
+                    <h3>{{ paymentMethod === 'qris' ? 'QRIS' : 'CASH' }}</h3>
+                    <ol v-if="paymentMethod === 'qris'">
+                        <li>Buat pesanan dan tampilkan gambar QRIS.</li>
+                        <li>
+                            Gunakan aplikasi bank atau dompet digital untuk
+                            membayar sesuai nominal.
+                        </li>
+                        <li>
+                            Tunggu status pembayaran terverifikasi sebelum
+                            pesanan diproses.
+                        </li>
+                    </ol>
+                    <ol v-else>
                         <li>Datang ke kasir dan tunjukkan struk pesananmu.</li>
                         <li>
                             Bayar tunai sesuai total yang dikonfirmasi kasir.
@@ -355,7 +370,7 @@ onMounted(() => {
                             pesanan diproses.
                         </li>
                     </ol>
-                    <p>
+                    <p v-if="paymentMethod === 'cash'">
                         Pembayaran tunai dilakukan di kasir setelah pesanan
                         dibuat.
                     </p>
@@ -371,7 +386,7 @@ onMounted(() => {
                 <button
                     type="submit"
                     :form="formId"
-                    :disabled="paymentMethod !== 'cash'"
+                    :disabled="!paymentMethod"
                     aria-describedby="customer-details-next-note"
                 >
                     Lanjut <AppIcon name="arrow" :size="16" />
@@ -381,7 +396,9 @@ onMounted(() => {
                 {{
                     paymentMethod === 'cash'
                         ? 'Buat pesanan, lalu bayar tunai di kasir sebelum batas waktu.'
-                        : 'Pilih CASH untuk melihat ringkasan. QRIS belum tersedia.'
+                        : paymentMethod === 'qris'
+                          ? 'Buat pesanan, lalu bayar lewat QRIS sebelum batas waktu.'
+                          : 'Pilih metode pembayaran untuk melanjutkan.'
                 }}
             </p>
             <a v-if="statusUrl" :href="statusUrl">Lihat struk pesanan</a>

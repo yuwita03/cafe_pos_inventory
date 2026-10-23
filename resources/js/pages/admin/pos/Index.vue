@@ -51,6 +51,7 @@ const productOpen = ref(false);
 const clearOpen = ref(false);
 const leavingVisit = shallowRef<PendingVisit | null>(null);
 const paymentOpen = ref(false);
+const paymentMethod = ref<'cash' | 'qris'>('cash');
 const cashReceived = ref<number | string>('');
 const processing = ref(false);
 const paymentError = ref('');
@@ -58,11 +59,12 @@ const receipt = ref<OrderData | null>(null);
 const receiptOpen = ref(false);
 type CheckoutPayload = {
     checkout_key: string;
+    payment_method: 'cash' | 'qris';
     customer_name: string;
     fulfillment_type: 'dine_in' | 'takeaway';
     table_id: number | null;
     expected_total_idr: number;
-    cash_received_idr: number;
+    cash_received_idr?: number;
     items: { variant_id: number; option_ids: number[]; quantity: number }[];
 };
 const pendingCheckout = ref<CheckoutPayload | null>(null);
@@ -256,18 +258,26 @@ async function closePayment(): Promise<void> {
     }
     returnToCart = false;
 }
-async function confirmCash(): Promise<void> {
-    if (processing.value || (!pendingCheckout.value && !cashValid.value)) {
+async function confirmPayment(): Promise<void> {
+    if (
+        processing.value ||
+        (!pendingCheckout.value &&
+            paymentMethod.value === 'cash' &&
+            !cashValid.value)
+    ) {
         return;
     }
     pendingCheckout.value ??= {
         checkout_key: crypto.randomUUID(),
+        payment_method: paymentMethod.value,
         customer_name: customerName.value.trim(),
         fulfillment_type: fulfillment.value,
         table_id:
             fulfillment.value === 'dine_in' ? Number(tableId.value) : null,
         expected_total_idr: total.value,
-        cash_received_idr: cashValue.value,
+        ...(paymentMethod.value === 'cash'
+            ? { cash_received_idr: cashValue.value }
+            : {}),
         items: cart.value.map((line) => ({
             variant_id: line.variantId,
             option_ids: [...line.optionIds],
@@ -285,7 +295,7 @@ async function confirmCash(): Promise<void> {
     } catch {
         pendingCheckout.value = null;
         paymentError.value =
-            'Browser tidak dapat menyimpan pemulihan checkout. Aktifkan penyimpanan sesi sebelum mengonfirmasi tunai.';
+            'Browser tidak dapat menyimpan pemulihan checkout. Aktifkan penyimpanan sesi sebelum melanjutkan.';
         return;
     }
     processing.value = true;
@@ -423,7 +433,8 @@ onMounted(() => {
                     recovery.payload.table_id === null
                         ? ''
                         : String(recovery.payload.table_id);
-                cashReceived.value = recovery.payload.cash_received_idr;
+                cashReceived.value = recovery.payload.cash_received_idr ?? '';
+                paymentMethod.value = recovery.payload.payment_method ?? 'cash';
                 paymentOpen.value = true;
                 paymentError.value =
                     'Ada checkout yang belum dipastikan. Coba ulang untuk mengambil hasil pesanan yang sama sebelum membuat transaksi baru.';
@@ -697,7 +708,11 @@ onBeforeUnmount(() => {
 
         <AppDialog
             :open="paymentOpen"
-            title="Pembayaran tunai"
+            :title="
+                paymentMethod === 'qris'
+                    ? 'Pembayaran QRIS'
+                    : 'Pembayaran tunai'
+            "
             class="pos-payment-dialog"
             @close="closePayment"
         >
@@ -715,29 +730,35 @@ onBeforeUnmount(() => {
                     </p>
                 </div>
                 <p class="pos-demo-note">
-                    <AppIcon name="info" :size="16" />Konfirmasi setelah uang
-                    tunai diterima. Sistem akan memvalidasi harga dan stok
-                    sebelum menyimpan pesanan.
+                    <AppIcon name="info" :size="16" />{{
+                        paymentMethod === 'cash'
+                            ? 'Konfirmasi setelah uang tunai diterima.'
+                            : 'QRIS akan ditampilkan setelah pesanan disimpan.'
+                    }}
+                    Sistem akan memvalidasi harga dan stok.
                 </p>
                 <fieldset class="pos-service pos-payment-method">
                     <legend>Metode pembayaran</legend>
-                    <label class="selected"
+                    <label :class="{ selected: paymentMethod === 'cash' }"
                         ><input
                             type="radio"
+                            v-model="paymentMethod"
                             name="pos-payment"
                             value="cash"
-                            checked
                         />Tunai</label
-                    ><label
+                    ><label :class="{ selected: paymentMethod === 'qris' }"
                         ><input
                             type="radio"
+                            v-model="paymentMethod"
                             name="pos-payment"
                             value="qris"
-                            disabled
-                        />QRIS · belum tersedia</label
+                        />QRIS</label
                     >
                 </fieldset>
-                <label class="field pos-cash-input" for="pos-cash"
+                <label
+                    v-if="paymentMethod === 'cash'"
+                    class="field pos-cash-input"
+                    for="pos-cash"
                     >Uang diterima<input
                         id="pos-cash"
                         v-model.number="cashReceived"
@@ -749,7 +770,7 @@ onBeforeUnmount(() => {
                         :readonly="processing || Boolean(pendingCheckout)"
                         aria-describedby="pos-cash-help"
                 /></label>
-                <div class="pos-quick-amounts">
+                <div v-if="paymentMethod === 'cash'" class="pos-quick-amounts">
                     <button
                         v-for="amount in quickAmounts"
                         :key="amount"
@@ -761,6 +782,7 @@ onBeforeUnmount(() => {
                     </button>
                 </div>
                 <p
+                    v-if="paymentMethod === 'cash'"
                     id="pos-cash-help"
                     class="pos-field-help"
                     :class="{ 'pos-error': cashReceived !== '' && !cashValid }"
@@ -771,7 +793,7 @@ onBeforeUnmount(() => {
                             : 'Harga akhir ditentukan oleh server saat konfirmasi.'
                     }}
                 </p>
-                <div class="pos-change">
+                <div v-if="paymentMethod === 'cash'" class="pos-change">
                     <span>Kembalian</span
                     ><strong>{{
                         rupiah(Math.max(0, cashValue - total))
@@ -792,32 +814,65 @@ onBeforeUnmount(() => {
                     >Periksa Pesanan</BaseButton
                 ><BaseButton
                     variant="primary"
-                    :disabled="processing || (!pendingCheckout && !cashValid)"
+                    :disabled="
+                        processing ||
+                        (!pendingCheckout &&
+                            paymentMethod === 'cash' &&
+                            !cashValid)
+                    "
                     :aria-busy="processing"
-                    @click="confirmCash"
+                    @click="confirmPayment"
                     >{{
                         processing
-                            ? 'Menyimpan pembayaran…'
+                            ? 'Menyimpan pesanan…'
                             : pendingCheckout
                               ? 'Coba ulang checkout'
-                              : 'Konfirmasi tunai'
+                              : paymentMethod === 'qris'
+                                ? 'Tampilkan QRIS'
+                                : 'Konfirmasi tunai'
                     }}</BaseButton
                 ></template
             >
         </AppDialog>
         <AppDialog
             :open="receiptOpen"
-            title="Pembayaran berhasil"
+            :title="
+                receipt?.method === 'qris'
+                    ? 'Bayar dengan QRIS'
+                    : 'Pembayaran berhasil'
+            "
             @close="receiptOpen = false"
         >
             <div v-if="receipt" class="pos-modal-content pos-receipt">
                 <span class="pos-receipt-icon"
-                    ><AppIcon name="check" :size="28" /></span
-                ><span class="pos-kicker"
-                    >TUNAI DITERIMA · PESANAN TERSIMPAN</span
-                >
+                    ><AppIcon
+                        :name="receipt.method === 'qris' ? 'qr' : 'check'"
+                        :size="28" /></span
+                ><span class="pos-kicker">{{
+                    receipt.method === 'qris'
+                        ? 'MENUNGGU PEMBAYARAN · PESANAN TERSIMPAN'
+                        : 'TUNAI DITERIMA · PESANAN TERSIMPAN'
+                }}</span>
                 <h3>{{ receipt.number }}</h3>
-                <p>Pesanan masuk antrean Kitchen. Stok sudah direservasi.</p>
+                <p>
+                    {{
+                        receipt.method === 'qris'
+                            ? 'Tunjukkan QRIS kepada pelanggan. Pesanan masuk kitchen setelah pembayaran terverifikasi.'
+                            : 'Pesanan masuk antrean Kitchen. Stok sudah direservasi.'
+                    }}
+                </p>
+                <div
+                    v-if="receipt.method === 'qris' && receipt.qrImageUrl"
+                    class="pos-qris-image"
+                >
+                    <img
+                        :src="receipt.qrImageUrl"
+                        :alt="`QRIS pembayaran ${receipt.number}`"
+                    />
+                </div>
+                <p v-if="receipt.method === 'qris' && !receipt.qrImageUrl">
+                    QRIS belum tersedia. Buka detail pesanan untuk mencoba lagi.
+                </p>
                 <dl>
                     <div>
                         <dt>Pelanggan</dt>
@@ -835,7 +890,13 @@ onBeforeUnmount(() => {
                     </div>
                     <div>
                         <dt>Pembayaran</dt>
-                        <dd>Tunai · Dibayar</dd>
+                        <dd>
+                            {{
+                                receipt.method === 'qris'
+                                    ? 'QRIS · Menunggu'
+                                    : 'Tunai · Dibayar'
+                            }}
+                        </dd>
                     </div>
                 </dl>
                 <div class="pos-receipt-items">
@@ -853,7 +914,11 @@ onBeforeUnmount(() => {
                     </div>
                 </div>
                 <div class="pos-grand-total">
-                    <span>Total dibayar</span
+                    <span>{{
+                        receipt.method === 'qris'
+                            ? 'Total tagihan'
+                            : 'Total dibayar'
+                    }}</span
                     ><strong>{{
                         rupiah(
                             receipt.lines.reduce(
@@ -864,7 +929,7 @@ onBeforeUnmount(() => {
                         )
                     }}</strong>
                 </div>
-                <div class="pos-total-row">
+                <div v-if="receipt.method === 'cash'" class="pos-total-row">
                     <span>Tunai / kembalian</span
                     ><span
                         >{{ rupiah(receipt.received ?? 0) }} /

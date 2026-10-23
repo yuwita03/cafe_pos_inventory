@@ -15,7 +15,7 @@ return new class extends Migration
         Schema::create('suppliers', function (Blueprint $table): void {
             $table->id();
             $table->string('name', 120);
-            $table->string('contact', 255)->nullable();
+            $table->text('contact')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
@@ -39,8 +39,31 @@ return new class extends Migration
             $table->unique(['purchase_id', 'stock_item_id']);
         });
         if (DB::getDriverName() === 'pgsql') {
-            DB::statement("ALTER TABLE purchases ADD CONSTRAINT purchases_status_valid CHECK (status IN ('draft', 'received', 'cancelled')), ADD CONSTRAINT purchases_receipt_valid CHECK ((status = 'received' AND received_at IS NOT NULL AND received_by_user_id IS NOT NULL) OR (status <> 'received' AND received_at IS NULL AND received_by_user_id IS NULL))");
-            DB::statement('ALTER TABLE purchase_items ADD CONSTRAINT purchase_items_quantity_positive CHECK (quantity > 0), ADD CONSTRAINT purchase_items_cost_nonnegative CHECK (line_cost_idr >= 0)');
+            DB::statement(<<<'SQL'
+                ALTER TABLE purchases
+                    ADD CONSTRAINT purchases_status_valid
+                        CHECK (status IN ('draft', 'received', 'cancelled')),
+                    ADD CONSTRAINT purchases_receipt_valid
+                        CHECK (
+                            (
+                                status = 'received'
+                                AND received_at IS NOT NULL
+                                AND received_by_user_id IS NOT NULL
+                            )
+                            OR (
+                                status <> 'received'
+                                AND received_at IS NULL
+                                AND received_by_user_id IS NULL
+                            )
+                        )
+                SQL);
+            DB::statement(<<<'SQL'
+                ALTER TABLE purchase_items
+                    ADD CONSTRAINT purchase_items_quantity_positive
+                        CHECK (quantity > 0),
+                    ADD CONSTRAINT purchase_items_cost_nonnegative
+                        CHECK (line_cost_idr >= 0)
+                SQL);
         }
     }
 
